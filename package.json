@@ -1,0 +1,42 @@
+{
+  "name": "code-line-highlighter",
+  "version": "2.1.4",
+  "description": "Highlight specific lines in code blocks using comment syntax",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "webpack --mode development --watch",
+    "build": "webpack --mode production && npm run package",
+    "package": "node scripts/package.js"
+  },
+  "keywords": [
+    "siyuan",
+    "plugin",
+    "code-block",
+    "highlighting",
+    "line-numbers"
+  ],
+  "author": "Langfeld",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "archiver": "^7.0.1",
+    "copy-webpack-plugin": "^11.0.0",
+    "css-loader": "^7.1.2",
+    "style-loader": "^4.0.0",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.3.2",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.4"
+  },
+  "dependencies": {
+    "siyuan": "^0.9.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/langfeld/code-line-highlighter"
+  },
+  "homepage": "https://github.com/langfeld/code-line-highlighter",
+  "bugs": {
+    "url": "https://github.com/langfeld/code-line-highlighter/issues"
+  }
+}

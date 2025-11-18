@@ -1,0 +1,16 @@
+/* Code Line Highlighter Plugin Styles */
+
+/* Overlay styling */
+.code-line-highlighter-overlay {
+    transition: opacity 0.2s ease;
+}
+
+/* Ensure proper z-index stacking */
+.hl-block .hljs {
+    isolation: isolate;
+}
+
+/* Line number highlighting */
+.hl-block .protyle-linenumber__rows span {
+    transition: background-color 0.2s ease;
+}

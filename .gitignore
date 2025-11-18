@@ -1,0 +1,19 @@
+# Node
+node_modules/
+/dist
+/build
+package.zip
+npm-debug.log
+.DS_Store
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# Typescript
+*.tsbuildinfo
+
+# Logs
+logs
+*.log

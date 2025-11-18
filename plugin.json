@@ -1,0 +1,62 @@
+{
+  "name": "code-line-highlighter",
+  "author": "Langfeld",
+  "url": "https://github.com/langfeld/code-line-highlighter",
+  "version": "2.1.4",
+  "minAppVersion": "3.0.0",
+  "backends": [
+    "windows",
+    "linux",
+    "darwin",
+    "ios",
+    "android",
+    "harmony",
+    "docker",
+    "all"
+  ],
+  "frontends": [
+    "desktop",
+    "mobile",
+    "browser-desktop",
+    "browser-mobile",
+    "desktop-window",
+    "all"
+  ],
+  "disabledInPublish": false,
+  "displayName": {
+    "default": "Code Line Highlighter",
+    "de_DE": "Code Line Highlighter",
+    "zh_CN": "代码行高亮"
+  },
+  "description": {
+    "default": "Highlight specific lines in code blocks",
+    "de_DE": "Hebe spezifische Zeilen in Code-Blöcken hervor",
+    "zh_CN": "使用注释语法在代码块中高亮特定的代码行"
+  },
+  "readme": {
+    "default": "README.md",
+    "de_DE": "README_de_DE.md",
+    "zh_CN": "README_zh_CN.md"
+  },
+  "icon": "icon.png",
+  "preview": "preview.png",
+  "screenshots": ["preview.png"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/langfeld/code-line-highlighter"
+  },
+  "homepage": "https://github.com/langfeld/code-line-highlighter",
+  "funding": {
+    "openCollective": "",
+    "patreon": "",
+    "github": "",
+    "custom": [
+      "https://ko-fi.com/langfeld"
+    ]
+  },
+  "keywords": [
+    "code",
+    "highlight"
+  ]
+}
