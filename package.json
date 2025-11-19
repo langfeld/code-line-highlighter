@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "webpack --mode development --watch",
-    "build": "webpack --mode production && npm run package",
+    "build": "rm -rf dist && webpack --mode production && npm run package",
     "package": "node scripts/package.js"
   },
   "keywords": [

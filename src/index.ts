@@ -441,7 +441,7 @@ export default class LineHighlightPlugin extends Plugin {
         // IMPORTANT: Check if wrapper already exists - avoid duplicates!
         const existingWrappers = lineNumberRows.querySelectorAll('.code-line-highlighter-overlay-wrapper');
         if (existingWrappers.length > 0) {
-            console.warn(`⚠️ Wrapper already exists (${existingWrappers.length}), removing before adding new one`);
+            // console.info(`⚠️ Wrapper already exists (${existingWrappers.length}), removing before adding new one`);
             existingWrappers.forEach(el => el.remove());
         }
 

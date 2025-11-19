@@ -34,9 +34,9 @@ module.exports = {
         { from: 'plugin.json', to: '.' },
         { from: 'README.md', to: '.' },
         { from: 'README_de_DE.md', to: '.' },
+        { from: 'README_zh_CN.md', to: '.' },
         { from: 'icon.png', to: '.', noErrorOnMissing: true },
-        { from: 'preview.png', to: '.', noErrorOnMissing: true },
-        { from: 'src/i18n', to: 'i18n', noErrorOnMissing: true }
+        { from: 'preview.png', to: '.', noErrorOnMissing: true }
       ]
     })
   ],
