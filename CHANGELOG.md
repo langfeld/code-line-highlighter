@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.5] - 2025-11-19
+### Changed
+- Build process optimized: README_zh_CN.md included in package, outdated i18n configuration removed, .d.ts files disabled, dist directory cleared before each build
+
 ## [2.1.4] - 2025-11-18
 ### Changed
 - Prevent duplicate overlays on note open (race condition fixes)
