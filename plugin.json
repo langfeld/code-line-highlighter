@@ -4,25 +4,9 @@
   "url": "https://github.com/langfeld/code-line-highlighter",
   "version": "2.1.4",
   "minAppVersion": "3.0.0",
-  "backends": [
-    "windows",
-    "linux",
-    "darwin",
-    "ios",
-    "android",
-    "harmony",
-    "docker",
-    "all"
-  ],
-  "frontends": [
-    "desktop",
-    "mobile",
-    "browser-desktop",
-    "browser-mobile",
-    "desktop-window",
-    "all"
-  ],
-  "disabledInPublish": false,
+  "backends": ["all"],
+  "frontends": ["all"],
+  "disabledInPublish": true,
   "displayName": {
     "default": "Code Line Highlighter",
     "de_DE": "Code Line Highlighter",
@@ -38,25 +22,9 @@
     "de_DE": "README_de_DE.md",
     "zh_CN": "README_zh_CN.md"
   },
-  "icon": "icon.png",
-  "preview": "preview.png",
-  "screenshots": ["preview.png"],
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/langfeld/code-line-highlighter"
-  },
-  "homepage": "https://github.com/langfeld/code-line-highlighter",
   "funding": {
-    "openCollective": "",
-    "patreon": "",
-    "github": "",
     "custom": [
       "https://ko-fi.com/langfeld"
     ]
-  },
-  "keywords": [
-    "code",
-    "highlight"
-  ]
+  }
 }

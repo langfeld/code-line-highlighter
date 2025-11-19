@@ -1,4 +1,0 @@
-{
-  "name": "Zeilen-Hervorhebung",
-  "description": "Hebe spezifische Zeilen in Code-Blöcken durch Kommentar-Syntax hervor (hl:1,3-5)"
-}

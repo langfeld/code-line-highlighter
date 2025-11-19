@@ -30,7 +30,7 @@ export default class LineHighlightPlugin extends Plugin {
     };
 
     onload() {
-        console.log("✅ Code Line Highlighter Plugin loaded - Version 2.1.4 - Prevents duplicates!");
+        // console.log("✅ Code Line Highlighter Plugin loaded - Version 2.1.4 - Prevents duplicates!");
 
         // CRITICAL: Monitor for overlays being added to code blocks and remove them!
         this.startCleanupObserver();
@@ -94,7 +94,7 @@ export default class LineHighlightPlugin extends Plugin {
             subtree: true
         });
 
-        console.log('🛡️ Cleanup observer active - overlays must be in .protyle-linenumber__rows');
+        // console.log('🛡️ Cleanup observer active - overlays must be in .protyle-linenumber__rows');
     }
 
     /**
@@ -107,7 +107,7 @@ export default class LineHighlightPlugin extends Plugin {
                 if (codeBlock && codeBlock.classList.contains('code-block')) {
                     const spec = codeBlock.getAttribute('data-hl-active');
                     if (spec) {
-                        console.log('🔄 Resize detected for code block, updating dimensions');
+                        // console.log('🔄 Resize detected for code block, updating dimensions');
                         // Re-apply highlights with updated dimensions
                         this.updateHighlightDimensions(codeBlock);
                     }
@@ -120,7 +120,7 @@ export default class LineHighlightPlugin extends Plugin {
             this.resizeObserver?.observe(block);
         });
 
-        console.log('📐 ResizeObserver active - highlights will adapt to window resize');
+        // console.log('📐 ResizeObserver active - highlights will adapt to window resize');
     }
 
     /**
@@ -132,11 +132,11 @@ export default class LineHighlightPlugin extends Plugin {
         const codeContentDiv = codeBlock.querySelector('.hljs div[contenteditable="true"]') as HTMLElement;
 
         if (!wrapper || !lineNumberRows || !codeContentDiv) {
-            console.log('⚠️ updateHighlightDimensions: Missing elements', {
-                wrapper: !!wrapper,
-                lineNumberRows: !!lineNumberRows,
-                codeContentDiv: !!codeContentDiv
-            });
+            // console.log('⚠️ updateHighlightDimensions: Missing elements', {
+            //     wrapper: !!wrapper,
+            //     lineNumberRows: !!lineNumberRows,
+            //     codeContentDiv: !!codeContentDiv
+            // });
             return;
         }
 
@@ -151,18 +151,18 @@ export default class LineHighlightPlugin extends Plugin {
         const contentWidth = codeContentRect.width;
         const wrapperWidth = lineNumberWidth + Math.abs(contentLeftOffset) + contentWidth;
 
-        console.log('📐 Updating dimensions:', {
-            lineNumberWidth,
-            contentLeftOffset,
-            contentWidth,
-            wrapperWidth
-        });
+        // console.log('📐 Updating dimensions:', {
+        //     lineNumberWidth,
+        //     contentLeftOffset,
+        //     contentWidth,
+        //     wrapperWidth
+        // });
 
         // Update wrapper dimensions
         wrapper.style.width = `${wrapperWidth}px`;
 
         // Overlays don't need left position update - they're always at left: 0 relative to wrapper
-        console.log('✅ Dimensions updated - overlays remain at left: 0');
+        // console.log('✅ Dimensions updated - overlays remain at left: 0');
     }
 
     /**
@@ -243,7 +243,6 @@ export default class LineHighlightPlugin extends Plugin {
                             // Check if this is a new document being loaded (protyle-wysiwyg)
                             if (element.classList?.contains('protyle-wysiwyg') ||
                                 element.querySelector?.('.protyle-wysiwyg')) {
-                                console.log('📄 New document detected');
                                 setTimeout(() => {
                                     this.processAllCodeBlocks();
                                     this.attachAllInputListeners();
@@ -281,7 +280,7 @@ export default class LineHighlightPlugin extends Plugin {
             attributeFilter: ['data-render']
         });
 
-        console.log('👀 Observer active on document.body');
+        // console.log('👀 Observer active on document.body');
     }
 
     /**
@@ -302,7 +301,7 @@ export default class LineHighlightPlugin extends Plugin {
             // Only process if this code block has highlights
             const activeSpec = codeBlock.getAttribute('data-hl-active');
             if (activeSpec) {
-                console.log('⌨️ Input detected in highlighted code block, re-processing...');
+                // console.log('⌨️ Input detected in highlighted code block, re-processing...');
                 // Force re-processing after a short delay to let SiYuan finish its updates
                 setTimeout(() => {
                     this.processCodeBlock(codeBlock);
@@ -312,7 +311,7 @@ export default class LineHighlightPlugin extends Plugin {
 
         contentEditable.addEventListener('input', listener);
         this.inputListeners.set(contentEditable, listener);
-        console.log('🎧 Input listener attached to code block');
+        // console.log('🎧 Input listener attached to code block');
     }
 
     /**
@@ -400,7 +399,6 @@ export default class LineHighlightPlugin extends Plugin {
         if (lineNumberRows) {
             const wrappers = lineNumberRows.querySelectorAll('.code-line-highlighter-overlay-wrapper');
             if (wrappers.length > 0) {
-                console.log(`🧹 Removing ${wrappers.length} overlay wrapper(s)`);
                 wrappers.forEach(el => el.remove());
             }
         }
@@ -489,7 +487,7 @@ export default class LineHighlightPlugin extends Plugin {
         const contentWidth = codeContentRect.width;
         const wrapperWidth = lineNumberWidth + Math.abs(contentLeftOffset) + contentWidth;
 
-        console.log(`📏 Measurements: lineNumberWidth=${lineNumberWidth}, contentLeftOffset=${contentLeftOffset}, contentWidth=${contentWidth}, paddingLeft=${paddingLeft}, wrapperWidth=${wrapperWidth}, codeContentRect.width=${codeContentRect.width}`);
+        // console.log(`📏 Measurements: lineNumberWidth=${lineNumberWidth}, contentLeftOffset=${contentLeftOffset}, contentWidth=${contentWidth}, paddingLeft=${paddingLeft}, wrapperWidth=${wrapperWidth}, codeContentRect.width=${codeContentRect.width}`);
 
         // Create wrapper to hold all overlays
         const wrapper = document.createElement('div');
@@ -540,7 +538,7 @@ export default class LineHighlightPlugin extends Plugin {
         // Insert wrapper INTO .protyle-linenumber__rows (NOT into wysiwyg!)
         lineNumberRows.appendChild(wrapper);
 
-        console.log('✅ Overlay wrapper added to .protyle-linenumber__rows for code block', codeBlockId);
+        // console.log('✅ Overlay wrapper added to .protyle-linenumber__rows for code block', codeBlockId);
     }
 
     /**
@@ -661,7 +659,5 @@ export default class LineHighlightPlugin extends Plugin {
 
         // Clean up any old-style containers (from previous versions)
     document.querySelectorAll('.code-line-highlighter-container').forEach(el => el.remove());
-
-    console.log("✅ Code Line Highlighter Plugin unloaded - Version 2.1.4");
     }
 }
