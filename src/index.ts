@@ -82,39 +82,43 @@ export default class LineHighlightPlugin extends Plugin {
             return;
         }
 
-        // Calculate which line was clicked
-        const lineNumber = this.getLineNumberFromRange(codeBlock, range);
-        if (lineNumber === null) {
+        // Calculate which lines are selected
+        const lineRange = this.getLineRangeFromSelection(codeBlock, range);
+        if (lineRange === null) {
             return;
         }
+
+        const { startLine, endLine } = lineRange;
+        const isMultiLine = startLine !== endLine;
+        const lineLabel = isMultiLine ? `lines ${startLine}-${endLine}` : `line ${startLine}`;
 
         // Add separator
         menu.addSeparator();
 
         // Add highlight submenu
         const highlightMenu = {
-            label: `Highlight line ${lineNumber}`,
+            label: `Highlight ${lineLabel}`,
             iconHTML: '🎨',
             submenu: [
                 {
                     label: 'Yellow',
                     iconHTML: '<span style="color: #ffc107;">●</span>',
-                    click: () => this.toggleHighlight(codeBlock, lineNumber, 'yellow')
+                    click: () => this.toggleHighlightRange(codeBlock, startLine, endLine, 'yellow')
                 },
                 {
                     label: 'Red',
                     iconHTML: '<span style="color: #f44336;">●</span>',
-                    click: () => this.toggleHighlight(codeBlock, lineNumber, 'red')
+                    click: () => this.toggleHighlightRange(codeBlock, startLine, endLine, 'red')
                 },
                 {
                     label: 'Green',
                     iconHTML: '<span style="color: #4caf50;">●</span>',
-                    click: () => this.toggleHighlight(codeBlock, lineNumber, 'green')
+                    click: () => this.toggleHighlightRange(codeBlock, startLine, endLine, 'green')
                 },
                 {
                     label: 'Blue',
                     iconHTML: '<span style="color: #2196f3;">●</span>',
-                    click: () => this.toggleHighlight(codeBlock, lineNumber, 'blue')
+                    click: () => this.toggleHighlightRange(codeBlock, startLine, endLine, 'blue')
                 }
             ]
         };
@@ -123,14 +127,109 @@ export default class LineHighlightPlugin extends Plugin {
 
         // Add remove highlight option
         menu.addItem({
-            label: `Remove highlight from line ${lineNumber}`,
+            label: `Remove highlight from ${lineLabel}`,
             iconHTML: '🚫',
-            click: () => this.removeHighlightFromLine(codeBlock, lineNumber)
+            click: () => this.removeHighlightFromLineRange(codeBlock, startLine, endLine)
         });
     }
 
     /**
-     * Get line number from cursor/selection position
+     * Get line range from selection (supports multi-line selection)
+     */
+    private getLineRangeFromSelection(codeBlock: HTMLElement, range: Range): { startLine: number, endLine: number } | null {
+        if (!range) {
+            return null;
+        }
+
+        const hljsElement = codeBlock.querySelector('.hljs');
+        if (!hljsElement) {
+            return null;
+        }
+
+        const codeContentDiv = hljsElement.querySelector('div[contenteditable="true"]') as HTMLElement;
+        if (!codeContentDiv) {
+            return null;
+        }
+
+        // Get the text content
+        const textContent = codeContentDiv.textContent || '';
+        const lines = textContent.split('\n');
+
+        // Helper function to calculate line number from offset
+        const getLineFromOffset = (offset: number): number => {
+            let currentOffset = 0;
+            for (let i = 0; i < lines.length; i++) {
+                currentOffset += lines[i].length + 1; // +1 for newline
+                if (offset < currentOffset) {
+                    return i + 1; // Line numbers are 1-based
+                }
+            }
+            return lines.length;
+        };
+
+        // Calculate start offset
+        const startOffset = this.calculateOffset(range.startContainer, range.startOffset, codeContentDiv);
+        if (startOffset === null) {
+            return null;
+        }
+
+        // Calculate end offset
+        const endOffset = this.calculateOffset(range.endContainer, range.endOffset, codeContentDiv);
+        if (endOffset === null) {
+            return null;
+        }
+
+        const startLine = getLineFromOffset(startOffset);
+        const endLine = getLineFromOffset(endOffset);
+
+        return { startLine, endLine };
+    }
+
+    /**
+     * Calculate offset from the start of contenteditable element
+     */
+    private calculateOffset(node: Node, offset: number, codeContentDiv: HTMLElement): number | null {
+        let startNode = node;
+        
+        // If startNode is not a text node, try to get a text node
+        if (startNode.nodeType !== Node.TEXT_NODE) {
+            const walker = document.createTreeWalker(
+                startNode,
+                NodeFilter.SHOW_TEXT,
+                null
+            );
+            const textNode = walker.nextNode();
+            if (!textNode) {
+                // If no text node found, can't determine offset
+                console.warn('Could not find text node for offset calculation');
+                return null;
+            }
+            startNode = textNode;
+        }
+
+        // Calculate offset from the start of contenteditable
+        let totalOffset = offset;
+        let currentNode: Node | null = startNode;
+
+        // Walk backwards to calculate total offset
+        while (currentNode && currentNode !== codeContentDiv) {
+            const prevSibling: Node | null = currentNode.previousSibling;
+            if (prevSibling) {
+                totalOffset += prevSibling.textContent?.length || 0;
+                currentNode = prevSibling;
+            } else {
+                currentNode = currentNode.parentNode;
+                if (currentNode === codeContentDiv) {
+                    break;
+                }
+            }
+        }
+
+        return totalOffset;
+    }
+
+    /**
+     * Get line number from cursor/selection position (legacy method, kept for compatibility)
      */
     private getLineNumberFromRange(codeBlock: HTMLElement, range: Range): number | null {
         if (!range) {
@@ -285,6 +384,100 @@ export default class LineHighlightPlugin extends Plugin {
 
         if (removed) {
             showMessage(`Highlight removed from line ${lineNumber}`, 2000, 'info');
+        }
+    }
+
+    /**
+     * Toggle highlight for a range of lines with a color
+     */
+    private async toggleHighlightRange(codeBlock: HTMLElement, startLine: number, endLine: number, color: 'yellow' | 'red' | 'green' | 'blue') {
+        const nodeElement = codeBlock.closest('[data-node-id]') as HTMLElement;
+        if (!nodeElement) {
+            showMessage('Cannot find block ID', 3000, 'error');
+            return;
+        }
+
+        const blockId = nodeElement.getAttribute('data-node-id');
+        if (!blockId) {
+            showMessage('Cannot find block ID', 3000, 'error');
+            return;
+        }
+
+        // Get current highlights from attributes
+        const groups = await this.getHighlightGroupsFromAttributes(blockId);
+
+        // Find the group for this color
+        let group = groups.find(g => g.color === color);
+        if (!group) {
+            group = { lines: [], color };
+            groups.push(group);
+        }
+
+        // Add all lines in the range if not already present
+        for (let line = startLine; line <= endLine; line++) {
+            if (!group.lines.includes(line)) {
+                group.lines.push(line);
+            }
+        }
+        group.lines.sort((a, b) => a - b);
+
+        // Save to attributes
+        await this.saveHighlightGroupsToAttributes(blockId, groups);
+
+        // Re-process the code block to apply changes (fire and forget)
+        this.processCodeBlock(codeBlock).catch(err => {
+            console.error('Error processing code block:', err);
+        });
+
+        const lineLabel = startLine === endLine ? `Line ${startLine}` : `Lines ${startLine}-${endLine}`;
+        showMessage(`${lineLabel} highlighted in ${color}`, 2000, 'info');
+    }
+
+    /**
+     * Remove highlight from a range of lines
+     */
+    private async removeHighlightFromLineRange(codeBlock: HTMLElement, startLine: number, endLine: number) {
+        const nodeElement = codeBlock.closest('[data-node-id]') as HTMLElement;
+        if (!nodeElement) {
+            showMessage('Cannot find block ID', 3000, 'error');
+            return;
+        }
+
+        const blockId = nodeElement.getAttribute('data-node-id');
+        if (!blockId) {
+            showMessage('Cannot find block ID', 3000, 'error');
+            return;
+        }
+
+        // Get current highlights from attributes
+        const groups = await this.getHighlightGroupsFromAttributes(blockId);
+
+        // Remove lines from all groups
+        let removed = false;
+        for (let line = startLine; line <= endLine; line++) {
+            for (const group of groups) {
+                const index = group.lines.indexOf(line);
+                if (index !== -1) {
+                    group.lines.splice(index, 1);
+                    removed = true;
+                }
+            }
+        }
+
+        // Remove empty groups
+        const filteredGroups = groups.filter(g => g.lines.length > 0);
+
+        // Save to attributes
+        await this.saveHighlightGroupsToAttributes(blockId, filteredGroups);
+
+        // Re-process the code block (fire and forget)
+        this.processCodeBlock(codeBlock).catch(err => {
+            console.error('Error processing code block:', err);
+        });
+
+        if (removed) {
+            const lineLabel = startLine === endLine ? `line ${startLine}` : `lines ${startLine}-${endLine}`;
+            showMessage(`Highlight removed from ${lineLabel}`, 2000, 'info');
         }
     }
 
