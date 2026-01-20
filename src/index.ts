@@ -39,8 +39,22 @@ export default class LineHighlightPlugin extends Plugin {
         'blue': 'custom-hlb'
     };
 
-    onload() {
+    // Default color configurations
+    private readonly defaultColors: Record<string, ColorTheme> = {
+        yellow: { background: 'rgba(255, 193, 7, 0.2)', border: '#ffc107' },
+        red: { background: 'rgba(244, 67, 54, 0.2)', border: '#f44336' },
+        green: { background: 'rgba(76, 175, 80, 0.2)', border: '#4caf50' },
+        blue: { background: 'rgba(33, 150, 243, 0.2)', border: '#2196f3' }
+    };
+
+    async onload() {
         // console.log("✅ Code Line Highlighter Plugin loaded - Version 3.0.0");
+
+        // Load custom colors from storage
+        await this.loadCustomColors();
+
+        // Setup settings panel
+        this.setupSettings();
 
         // CRITICAL: Monitor for overlays being added to code blocks and remove them!
         this.startCleanupObserver();
@@ -67,6 +81,182 @@ export default class LineHighlightPlugin extends Plugin {
 
         // Add context menu listener for right-click on code blocks
         this.eventBus.on("open-menu-content", this.handleContextMenu.bind(this));
+    }
+
+    /**
+     * Load custom colors from storage
+     */
+    private async loadCustomColors() {
+        try {
+            const customColors = await this.loadData('colors.json');
+            if (customColors) {
+                // Merge custom colors with defaults
+                Object.assign(this.colors, this.defaultColors, customColors);
+            }
+        } catch (error) {
+            console.error('Error loading custom colors:', error);
+        }
+    }
+
+    /**
+     * Save custom colors to storage
+     */
+    private async saveCustomColors() {
+        try {
+            await this.saveData('colors.json', this.colors);
+            // Re-process all code blocks to apply new colors
+            this.processAllCodeBlocks();
+        } catch (error) {
+            console.error('Error saving custom colors:', error);
+        }
+    }
+
+    /**
+     * Setup settings panel
+     */
+    private setupSettings() {
+        const setting = this.setting;
+
+        setting.addItem({
+            title: 'Highlight Colors',
+            description: 'Customize the colors used for code line highlighting',
+            direction: 'column',
+            createActionElement: () => {
+                const container = document.createElement('div');
+                container.style.cssText = 'display: flex; flex-direction: column; gap: 16px; width: 100%;';
+
+                const colorNames: Array<'yellow' | 'red' | 'green' | 'blue'> = ['yellow', 'red', 'green', 'blue'];
+                
+                colorNames.forEach(colorName => {
+                    const colorRow = document.createElement('div');
+                    colorRow.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 8px; border: 1px solid var(--b3-border-color); border-radius: 4px;';
+
+                    // Color name label
+                    const label = document.createElement('div');
+                    label.textContent = colorName.charAt(0).toUpperCase() + colorName.slice(1);
+                    label.style.cssText = 'min-width: 80px; font-weight: 500;';
+                    colorRow.appendChild(label);
+
+                    // Background color picker
+                    const bgLabel = document.createElement('span');
+                    bgLabel.textContent = 'Background:';
+                    bgLabel.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface);';
+                    colorRow.appendChild(bgLabel);
+
+                    const bgInput = document.createElement('input');
+                    bgInput.type = 'color';
+                    bgInput.value = this.rgbaToHex(this.colors[colorName].background);
+                    bgInput.style.cssText = 'width: 50px; height: 30px; border: none; cursor: pointer;';
+                    bgInput.addEventListener('change', async () => {
+                        const opacity = this.extractOpacity(this.colors[colorName].background);
+                        this.colors[colorName].background = this.hexToRgba(bgInput.value, opacity);
+                        await this.saveCustomColors();
+                    });
+                    colorRow.appendChild(bgInput);
+
+                    // Opacity slider
+                    const opacityLabel = document.createElement('span');
+                    opacityLabel.textContent = 'Opacity:';
+                    opacityLabel.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); margin-left: 8px;';
+                    colorRow.appendChild(opacityLabel);
+
+                    const opacityInput = document.createElement('input');
+                    opacityInput.type = 'range';
+                    opacityInput.min = '0';
+                    opacityInput.max = '100';
+                    opacityInput.value = String(this.extractOpacity(this.colors[colorName].background) * 100);
+                    opacityInput.style.cssText = 'width: 100px;';
+                    opacityInput.addEventListener('input', async () => {
+                        const opacity = parseFloat(opacityInput.value) / 100;
+                        const hex = this.rgbaToHex(this.colors[colorName].background);
+                        this.colors[colorName].background = this.hexToRgba(hex, opacity);
+                        await this.saveCustomColors();
+                    });
+                    colorRow.appendChild(opacityInput);
+
+                    // Border color picker
+                    const borderLabel = document.createElement('span');
+                    borderLabel.textContent = 'Border:';
+                    borderLabel.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); margin-left: 8px;';
+                    colorRow.appendChild(borderLabel);
+
+                    const borderInput = document.createElement('input');
+                    borderInput.type = 'color';
+                    borderInput.value = this.colors[colorName].border;
+                    borderInput.style.cssText = 'width: 50px; height: 30px; border: none; cursor: pointer;';
+                    borderInput.addEventListener('change', async () => {
+                        this.colors[colorName].border = borderInput.value;
+                        await this.saveCustomColors();
+                    });
+                    colorRow.appendChild(borderInput);
+
+                    // Reset button
+                    const resetBtn = document.createElement('button');
+                    resetBtn.textContent = '↺';
+                    resetBtn.title = 'Reset to default';
+                    resetBtn.style.cssText = 'padding: 4px 8px; margin-left: auto; cursor: pointer; border: 1px solid var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-background);';
+                    resetBtn.addEventListener('click', async () => {
+                        this.colors[colorName] = { ...this.defaultColors[colorName] };
+                        bgInput.value = this.rgbaToHex(this.colors[colorName].background);
+                        opacityInput.value = String(this.extractOpacity(this.colors[colorName].background) * 100);
+                        borderInput.value = this.colors[colorName].border;
+                        await this.saveCustomColors();
+                    });
+                    colorRow.appendChild(resetBtn);
+
+                    container.appendChild(colorRow);
+                });
+
+                // Reset all button
+                const resetAllBtn = document.createElement('button');
+                resetAllBtn.textContent = 'Reset All Colors to Default';
+                resetAllBtn.style.cssText = 'padding: 8px 16px; cursor: pointer; border: 1px solid var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-background); margin-top: 8px;';
+                resetAllBtn.addEventListener('click', async () => {
+                    Object.assign(this.colors, this.defaultColors);
+                    await this.saveCustomColors();
+                    // Reload the settings panel
+                    this.openSetting();
+                });
+                container.appendChild(resetAllBtn);
+
+                return container;
+            }
+        });
+    }
+
+    /**
+     * Convert rgba string to hex color
+     */
+    private rgbaToHex(rgba: string): string {
+        const match = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
+        if (!match) return '#000000';
+        
+        const r = parseInt(match[1]);
+        const g = parseInt(match[2]);
+        const b = parseInt(match[3]);
+        
+        return '#' + [r, g, b].map(x => {
+            const hex = x.toString(16);
+            return hex.length === 1 ? '0' + hex : hex;
+        }).join('');
+    }
+
+    /**
+     * Convert hex color to rgba with opacity
+     */
+    private hexToRgba(hex: string, opacity: number): string {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    }
+
+    /**
+     * Extract opacity from rgba string
+     */
+    private extractOpacity(rgba: string): number {
+        const match = rgba.match(/rgba?\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)/);
+        return match ? parseFloat(match[1]) : 0.2;
     }
 
     /**
