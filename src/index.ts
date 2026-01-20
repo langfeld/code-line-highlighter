@@ -138,10 +138,16 @@ export default class LineHighlightPlugin extends Plugin {
         });
 
         this.setting.addItem({
-            title: 'Highlight Colors',
-            description: 'Customize the colors used for code line highlighting',
-            direction: 'row',
+            title: '',
+            description: '',
+            direction: 'column',
             createActionElement: () => {
+                const wrapper = this.createElement('div', { display: 'flex', flexDirection: 'column', width: '100%' });
+
+                // Custom Title & Description
+                wrapper.appendChild(this.createElement('div', { fontWeight: 'bold', marginBottom: '5px' }, {}, ['Highlight Colors']));
+                wrapper.appendChild(this.createElement('div', { marginBottom: '10px' }, {}, ['Customize the colors used for code line highlighting']));
+
                 const container = this.createElement('div', { display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' });
 
                 COLORS.forEach(colorName => {
@@ -203,7 +209,8 @@ export default class LineHighlightPlugin extends Plugin {
                     }}, ['Reset All Colors to Default']
                 ));
 
-                return container;
+                wrapper.appendChild(container);
+                return wrapper;
             }
         });
     }
