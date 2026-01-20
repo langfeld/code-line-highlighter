@@ -131,7 +131,7 @@ export default class LineHighlightPlugin extends Plugin {
         this.setting.addItem({
             title: 'Highlight Colors',
             description: 'Customize the colors used for code line highlighting',
-            direction: 'column',
+            direction: 'row',
             createActionElement: () => {
                 const container = document.createElement('div');
                 container.style.cssText = 'display: flex; flex-direction: column; gap: 16px; width: 100%;';
@@ -141,6 +141,7 @@ export default class LineHighlightPlugin extends Plugin {
                 colorNames.forEach(colorName => {
                     const colorRow = document.createElement('div');
                     colorRow.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 8px; border: 1px solid var(--b3-border-color); border-radius: 4px;';
+                    colorRow.setAttribute('data-color-name', colorName);
 
                     // Color name label
                     const label = document.createElement('div');
@@ -158,6 +159,7 @@ export default class LineHighlightPlugin extends Plugin {
                     bgInput.type = 'color';
                     bgInput.value = this.rgbaToHex(this.colors[colorName].background);
                     bgInput.style.cssText = 'width: 50px; height: 30px; border: none; cursor: pointer;';
+                    bgInput.setAttribute('data-input-type', 'background');
                     bgInput.addEventListener('change', async () => {
                         const opacity = this.extractOpacity(this.colors[colorName].background);
                         this.colors[colorName].background = this.hexToRgba(bgInput.value, opacity);
@@ -177,6 +179,7 @@ export default class LineHighlightPlugin extends Plugin {
                     opacityInput.max = '100';
                     opacityInput.value = String(this.extractOpacity(this.colors[colorName].background) * 100);
                     opacityInput.style.cssText = 'width: 100px;';
+                    opacityInput.setAttribute('data-input-type', 'opacity');
                     opacityInput.addEventListener('input', async () => {
                         const opacity = parseFloat(opacityInput.value) / 100;
                         const hex = this.rgbaToHex(this.colors[colorName].background);
@@ -195,6 +198,7 @@ export default class LineHighlightPlugin extends Plugin {
                     borderInput.type = 'color';
                     borderInput.value = this.colors[colorName].border;
                     borderInput.style.cssText = 'width: 50px; height: 30px; border: none; cursor: pointer;';
+                    borderInput.setAttribute('data-input-type', 'border');
                     borderInput.addEventListener('change', async () => {
                         this.colors[colorName].border = borderInput.value;
                         await this.saveCustomColors();
@@ -223,10 +227,24 @@ export default class LineHighlightPlugin extends Plugin {
                 resetAllBtn.textContent = 'Reset All Colors to Default';
                 resetAllBtn.style.cssText = 'padding: 8px 16px; cursor: pointer; border: 1px solid var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-background); margin-top: 8px;';
                 resetAllBtn.addEventListener('click', async () => {
+                    // Reset all colors to defaults
                     this.colors = { ...this.defaultColors };
+                    
+                    // Update all UI elements
+                    colorNames.forEach(colorName => {
+                        const colorRow = container.querySelector(`[data-color-name="${colorName}"]`) as HTMLElement;
+                        if (colorRow) {
+                            const bgInput = colorRow.querySelector('[data-input-type="background"]') as HTMLInputElement;
+                            const opacityInput = colorRow.querySelector('[data-input-type="opacity"]') as HTMLInputElement;
+                            const borderInput = colorRow.querySelector('[data-input-type="border"]') as HTMLInputElement;
+                            
+                            if (bgInput) bgInput.value = this.rgbaToHex(this.colors[colorName].background);
+                            if (opacityInput) opacityInput.value = String(this.extractOpacity(this.colors[colorName].background) * 100);
+                            if (borderInput) borderInput.value = this.colors[colorName].border;
+                        }
+                    });
+                    
                     await this.saveCustomColors();
-                    // Reload the settings panel
-                    this.openSetting();
                 });
                 container.appendChild(resetAllBtn);
 
@@ -315,22 +333,22 @@ export default class LineHighlightPlugin extends Plugin {
             submenu: [
                 {
                     label: 'Yellow',
-                    iconHTML: '<span style="color: #ffc107;">●</span>',
+                    iconHTML: `<span style="color: ${this.colors.yellow.border};">●</span>`,
                     click: () => this.toggleHighlightRange(codeBlock, startLine, endLine, 'yellow')
                 },
                 {
                     label: 'Red',
-                    iconHTML: '<span style="color: #f44336;">●</span>',
+                    iconHTML: `<span style="color: ${this.colors.red.border};">●</span>`,
                     click: () => this.toggleHighlightRange(codeBlock, startLine, endLine, 'red')
                 },
                 {
                     label: 'Green',
-                    iconHTML: '<span style="color: #4caf50;">●</span>',
+                    iconHTML: `<span style="color: ${this.colors.green.border};">●</span>`,
                     click: () => this.toggleHighlightRange(codeBlock, startLine, endLine, 'green')
                 },
                 {
                     label: 'Blue',
-                    iconHTML: '<span style="color: #2196f3;">●</span>',
+                    iconHTML: `<span style="color: ${this.colors.blue.border};">●</span>`,
                     click: () => this.toggleHighlightRange(codeBlock, startLine, endLine, 'blue')
                 }
             ]
