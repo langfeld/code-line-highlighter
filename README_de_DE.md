@@ -7,7 +7,7 @@ Hebe bestimmte Codezeilen in SiYuan-Codeblöcken hervor — per intuitivem Konte
 ### Methode 1: Kontextmenü (Neu in v3.0.0)
 
 Rechtsklicke einfach auf eine Zeile (oder markiere mehrere Zeilen) in einem Codeblock, um:
-- Eine oder mehrere Zeilen in einer gewählten Farbe hervorzuheben (gelb, rot, grün, blau)
+- Eine oder mehrere Zeilen in einer gewählten Farbe hervorzuheben (gelb, rot, grün, blau + 3 Benutzerdefinierte)
 - Bestehende Hervorhebungen von einer oder mehreren Zeilen zu entfernen
 
 Mehrere Zeilen auswählen: Markiere z. B. Zeilen 3–10 und rechtsklicke, um alle auf einmal zu markieren.
@@ -51,6 +51,18 @@ const note2 = "Zeile 6 - blau";
 const note3 = "Zeile 7 - blau";
 ```
 
+#### Neue nummerische Syntax (ab v3.0.0)
+
+Du kannst auch Zahlen `1-7` statt Buchstaben verwenden:
+
+- `hl1`...`hl4`: Standardfarben (Gelb, Rot, Grün, Blau)
+- `hl5`...`hl7`: **Custom Colors** (in den Einstellungen definiert)
+
+Beispiel:
+```javascript
+// hl5:1-3;hl2:10
+```
+
 #### Unterstützte Kommentar-Syntaxen
 
 - `// ...` (JavaScript, TypeScript, C++, Java, etc.)
@@ -61,8 +73,12 @@ const note3 = "Zeile 7 - blau";
 ## Features
 
 - ✅ Kontextmenü-Integration — Rechtsklick zum Hervorheben/Entfernen
+- ✅ **Schnellzugriff** — Wähle eine Standardfarbe für 1-Klick-Highlighting
 - ✅ Mehrzeilenauswahl — Markiere und hebe mehrere Zeilen gleichzeitig hervor (z. B. 3–10)
+- ✅ **7 Farben** — 4 Standard + 3 Benutzerdefinierte Farben
 - ✅ Anpassbare Farben — Farben (Hintergrund, Rahmen, Opazität) in den Einstellungen ändern
+- ✅ **Eigene Bezeichnungen** — Benenne Farben um (z. B. „Fehler“, „Todo“)
+- ✅ **Sichtbarkeit umschalten** — Verstecke Farben, die du nicht nutzt
 - ✅ Speicherung in Block-Attributen — Hervorhebungen werden nicht in den Code geschrieben
 - ✅ Nicht-invasive Overlays (nicht im Notizinhalt gespeichert)
 - ✅ Mehrfarben-Unterstützung (gelb, rot, grün, blau)
@@ -74,10 +90,11 @@ const note3 = "Zeile 7 - blau";
 
 Öffne die Plugin-Einstellungen, um Hervorhebungsfarben zu personalisieren:
 1. Einstellungen → Plugins → Code Line Highlighter → Settings
-2. Passe jede Farbe an (gelb, rot, grün, blau):
-	- Hintergrundfarbe: Farbwähler
-	- Opazität: Transparenz von 0–100 %
-	- Rahmenfarbe: Akzent-/Border-Farbe
+2. Passe jede Farbe an (gelb, rot, grün, blau, custom1-3):
+	- **Standard**: Wähle, welche Farbe ganz oben im Menü erscheint
+	- **Sichtbar**: Farben im Menü ein-/ausblenden
+	- **Label**: Farben umbenennen (z. B. „Wichtig“ statt „Rot“)
+	- **Farbe**: Volle Kontrolle über Hintergrund, Rahmen und Opazität
 3. Einzelne Reset-Buttons oder „Alle Farben auf Standard zurücksetzen“ nutzen
 4. Änderungen werden sofort auf alle hervorgehobenen Codeblöcke angewendet
 

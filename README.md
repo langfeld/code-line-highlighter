@@ -7,7 +7,7 @@ Highlight specific code lines in SiYuan code blocks using an intuitive context m
 ### Method 1: Context Menu (New in v3.0.0) 🎨
 
 Simply **right-click** on any line (or select multiple lines) in a code block to:
-- Highlight single or multiple lines with your choice of color (yellow, red, green, blue)
+- Highlight single or multiple lines with your choice of color (yellow, red, green, blue + 3 Custom Colors)
 - Remove existing highlights from single or multiple lines
 
 **Multi-Line Selection**: Select lines 3-10 and right-click to highlight all of them at once!
@@ -51,6 +51,18 @@ const note2 = "line 6 - blue";
 const note3 = "line 7 - blue";
 ```
 
+#### New Numerical Syntax (v3.0.0+)
+
+You can also use numbers `1-7` instead of letters:
+
+- `hl1`...`hl4`: Standard colors (Yellow, Red, Green, Blue)
+- `hl5`...`hl7`: **Custom Colors** defined in settings
+
+Example:
+```javascript
+// hl5:1-3;hl2:10
+```
+
 #### Supported Comment Syntaxes
 
 - `// ...` (JavaScript, TypeScript, C++, Java, etc.)
@@ -61,8 +73,12 @@ const note3 = "line 7 - blue";
 ## Features
 
 - ✅ **Context menu integration** - Right-click to highlight/unhighlight lines
+- ✅ **Quick Access** - Set a default color for one-click highlighting
 - ✅ **Multi-line selection** - Select and highlight multiple lines at once (e.g., lines 3-10)
+- ✅ **7 Color Slots** - 4 Standard + 3 Custom Colors
 - ✅ **Customizable colors** - Personalize colors via settings panel (background, border, opacity)
+- ✅ **Renamable Labels** - Give your colors meaningful names (e.g., "Error", "Todo")
+- ✅ **Toggle Visibility** - Hide colors you don't use
 - ✅ **Attribute-based storage** - Highlights stored in block attributes, not in code
 - ✅ Non-invasive overlays (not saved into note content)
 - ✅ Multi-color support (yellow, red, green, blue)
@@ -74,10 +90,11 @@ const note3 = "line 7 - blue";
 
 Access plugin settings to customize highlight colors:
 1. Go to Settings → Plugins → Code Line Highlighter → Settings
-2. Customize each color (yellow, red, green, blue):
-   - **Background Color**: Choose any color with the color picker
-   - **Opacity**: Adjust transparency from 0-100%
-   - **Border Color**: Choose the border/accent color
+2. Customize each color (yellow, red, green, blue, custom1-3):
+   - **Default**: Select which color appears at the top of the context menu
+   - **Visible**: Show/Hide color in the menu
+   - **Label**: Rename colors (e.g., "Important" instead of "Red")
+   - **Background/Border/Opacity**: Full color control
 3. Click individual reset buttons or "Reset All Colors to Default"
 4. Changes apply immediately to all highlighted code blocks
 
