@@ -113,17 +113,27 @@ export default class LineHighlightPlugin extends Plugin {
         if (!this.setting) this.setting = new Setting({ confirmCallback: () => {} });
 
         this.setting.addItem({
-            title: 'Auto Enable Line Numbers',
-            description: 'Automatically enable line numbers when adding highlights (Required for highlights to show properly)',
-            direction: 'row',
+            title: '',
+            description: '',
+            direction: 'column',
             createActionElement: () => {
+                const wrapper = this.createElement('div', { display: 'flex', flexDirection: 'column', width: '100%', marginBottom: '10px' });
+
+                // Custom Title
+                wrapper.appendChild(this.createElement('div', { fontWeight: 'bold', marginBottom: '5px' }, {}, ['Auto Enable Line Numbers']));
+
+                const container = this.createElement('div', { display: 'flex', alignItems: 'center', width: '100%' });
                 const switchEl = this.createElement('input', { cursor: 'pointer' }, { type: 'checkbox' });
                 if (this.config.autoEnableLineNumber) switchEl.checked = true;
                 switchEl.addEventListener('change', async () => {
                     this.config.autoEnableLineNumber = switchEl.checked;
                     await this.saveConfig();
                 });
-                return switchEl;
+                container.appendChild(switchEl);
+                container.appendChild(this.createElement('span', { marginLeft: '8px' }, {}, ['Automatically enable line numbers when adding highlights (Required for highlights to show properly)']));
+
+                wrapper.appendChild(container);
+                return wrapper;
             }
         });
 
@@ -430,7 +440,7 @@ export default class LineHighlightPlugin extends Plugin {
         const contentRect = content.getBoundingClientRect();
         const padding = parseFloat(window.getComputedStyle(content).paddingLeft) || 0;
         const offset = (contentRect.left - rowRect.left) - padding;
-        const totalWidth = rowRect.width + Math.abs(offset) + contentRect.width;
+        const totalWidth = rowRect.width + Math.abs(offset) + contentRect.width - 10;
 
         // CRITICAL FIX: Wrapper has 0 width to not affect layout, overlays have full width
         wrapper.style.width = '0px';
@@ -576,7 +586,7 @@ export default class LineHighlightPlugin extends Plugin {
         const contentRect = content.getBoundingClientRect();
         const padding = parseFloat(window.getComputedStyle(content).paddingLeft) || 0;
         const offset = (contentRect.left - rowRect.left) - padding;
-        const totalWidth = rowRect.width + Math.abs(offset) + contentRect.width;
+        const totalWidth = rowRect.width + Math.abs(offset) + contentRect.width - 10;
 
         const wrapper = this.createElement('div',
             { position: 'absolute', left: '-10px', top: '0', width: '0px', height: '100%', pointerEvents: 'none', zIndex: '10', overflow: 'visible' },
