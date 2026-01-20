@@ -23,14 +23,6 @@ export default class LineHighlightPlugin extends Plugin {
     private resizeObserver: ResizeObserver | null = null;
     private inputListeners: WeakMap<HTMLElement, (e: Event) => void> = new WeakMap();
 
-    // Color definitions
-    private readonly colors: Record<string, ColorTheme> = {
-        yellow: { background: 'rgba(255, 193, 7, 0.2)', border: '#ffc107' },
-        red: { background: 'rgba(244, 67, 54, 0.2)', border: '#f44336' },
-        green: { background: 'rgba(76, 175, 80, 0.2)', border: '#4caf50' },
-        blue: { background: 'rgba(33, 150, 243, 0.2)', border: '#2196f3' }
-    };
-
     // Map colors to attribute names
     private readonly colorToAttr: Record<string, string> = {
         'yellow': 'custom-hl',
@@ -46,6 +38,9 @@ export default class LineHighlightPlugin extends Plugin {
         green: { background: 'rgba(76, 175, 80, 0.2)', border: '#4caf50' },
         blue: { background: 'rgba(33, 150, 243, 0.2)', border: '#2196f3' }
     };
+
+    // Current color configurations (initialized from defaults, can be customized)
+    private colors: Record<string, ColorTheme> = {};
 
     async onload() {
         // console.log("✅ Code Line Highlighter Plugin loaded - Version 3.0.0");
@@ -89,12 +84,15 @@ export default class LineHighlightPlugin extends Plugin {
     private async loadCustomColors() {
         try {
             const customColors = await this.loadData('colors.json');
+            // Start with defaults, then override with custom colors
+            this.colors = { ...this.defaultColors };
             if (customColors) {
-                // Merge custom colors with defaults
-                Object.assign(this.colors, this.defaultColors, customColors);
+                Object.assign(this.colors, customColors);
             }
         } catch (error) {
             console.error('Error loading custom colors:', error);
+            // Fallback to defaults on error
+            this.colors = { ...this.defaultColors };
         }
     }
 
@@ -212,7 +210,7 @@ export default class LineHighlightPlugin extends Plugin {
                 resetAllBtn.textContent = 'Reset All Colors to Default';
                 resetAllBtn.style.cssText = 'padding: 8px 16px; cursor: pointer; border: 1px solid var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-background); margin-top: 8px;';
                 resetAllBtn.addEventListener('click', async () => {
-                    Object.assign(this.colors, this.defaultColors);
+                    this.colors = { ...this.defaultColors };
                     await this.saveCustomColors();
                     // Reload the settings panel
                     this.openSetting();
@@ -255,8 +253,20 @@ export default class LineHighlightPlugin extends Plugin {
      * Extract opacity from rgba string
      */
     private extractOpacity(rgba: string): number {
-        const match = rgba.match(/rgba?\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)/);
-        return match ? parseFloat(match[1]) : 0.2;
+        // Handle rgba() format with alpha channel
+        const rgbaMatch = rgba.match(/rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)/);
+        if (rgbaMatch) {
+            return parseFloat(rgbaMatch[1]);
+        }
+        
+        // Handle rgb() format without alpha (default to 0.2)
+        const rgbMatch = rgba.match(/rgb\([^,]+,[^,]+,[^,]+\)/);
+        if (rgbMatch) {
+            return 0.2;
+        }
+        
+        // Fallback
+        return 0.2;
     }
 
     /**
