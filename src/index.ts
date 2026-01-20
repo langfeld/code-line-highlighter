@@ -31,8 +31,16 @@ export default class LineHighlightPlugin extends Plugin {
         blue: { background: 'rgba(33, 150, 243, 0.2)', border: '#2196f3' }
     };
 
+    // Map colors to attribute names
+    private readonly colorToAttr: Record<string, string> = {
+        'yellow': 'custom-hl',
+        'red': 'custom-hlr',
+        'green': 'custom-hlg',
+        'blue': 'custom-hlb'
+    };
+
     onload() {
-        // console.log("✅ Code Line Highlighter Plugin loaded - Version 2.1.4 - Prevents duplicates!");
+        // console.log("✅ Code Line Highlighter Plugin loaded - Version 3.0.0");
 
         // CRITICAL: Monitor for overlays being added to code blocks and remove them!
         this.startCleanupObserver();
@@ -153,7 +161,13 @@ export default class LineHighlightPlugin extends Plugin {
                 NodeFilter.SHOW_TEXT,
                 null
             );
-            startNode = walker.nextNode() || startNode;
+            const textNode = walker.nextNode();
+            if (!textNode) {
+                // If no text node found, can't determine line number
+                console.warn('Could not find text node for line number calculation');
+                return null;
+            }
+            startNode = textNode;
         }
 
         // Calculate offset from the start of contenteditable
@@ -288,15 +302,12 @@ export default class LineHighlightPlugin extends Plugin {
             const attrs = response.data || {};
             const groups: HighlightGroup[] = [];
 
-            // Map attribute names to colors
-            const attrMap: Record<string, 'yellow' | 'red' | 'green' | 'blue'> = {
-                'custom-hl': 'yellow',
-                'custom-hlr': 'red',
-                'custom-hlg': 'green',
-                'custom-hlb': 'blue'
-            };
+            // Invert colorToAttr mapping for reading
+            const attrToColor = Object.fromEntries(
+                Object.entries(this.colorToAttr).map(([color, attr]) => [attr, color as 'yellow' | 'red' | 'green' | 'blue'])
+            );
 
-            for (const [attrName, color] of Object.entries(attrMap)) {
+            for (const [attrName, color] of Object.entries(attrToColor)) {
                 const value = attrs[attrName];
                 if (value) {
                     const lines = this.parseLineSpec(value);
@@ -318,26 +329,18 @@ export default class LineHighlightPlugin extends Plugin {
      */
     private async saveHighlightGroupsToAttributes(blockId: string, groups: HighlightGroup[]): Promise<void> {
         try {
-            // Map colors to attribute names
-            const colorToAttr: Record<string, string> = {
-                'yellow': 'custom-hl',
-                'red': 'custom-hlr',
-                'green': 'custom-hlg',
-                'blue': 'custom-hlb'
-            };
-
             const attrs: Record<string, string> = {};
 
             for (const group of groups) {
-                const attrName = colorToAttr[group.color];
+                const attrName = this.colorToAttr[group.color];
                 if (attrName && group.lines.length > 0) {
                     attrs[attrName] = this.formatLineSpec(group.lines);
                 }
             }
 
             // Also set empty strings for colors that are not used (to clear them)
-            for (const color of ['yellow', 'red', 'green', 'blue']) {
-                const attrName = colorToAttr[color];
+            for (const color of Object.keys(this.colorToAttr)) {
+                const attrName = this.colorToAttr[color];
                 if (!(attrName in attrs)) {
                     attrs[attrName] = '';
                 }
