@@ -666,7 +666,7 @@ export default class LineHighlightPlugin extends Plugin {
         const totalWidth = rowRect.width + Math.abs(offset) + contentRect.width - 10;
 
         const wrapper = this.createElement('div',
-            { position: 'absolute', left: '-10px', top: '0', width: '0px', height: '100%', pointerEvents: 'none', zIndex: '10', overflow: 'visible' },
+            { position: 'absolute', left: '-10px', top: '0', width: '0px', height: '100%', pointerEvents: 'none', zIndex: '1', overflow: 'visible' },
             { class: 'code-line-highlighter-overlay-wrapper', 'data-code-block-id': this.getCodeBlockId(codeBlock), 'data-hl-spec': spec }
         );
 
