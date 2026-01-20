@@ -692,17 +692,26 @@ export default class LineHighlightPlugin extends Plugin {
 
         const groups: HighlightGroup[] = [];
         let hasMatch = false, match;
-        const regex = /hl([rgby])?:([0-9,\-]+)/g;
+        const regex = /hl([rgby1-7])?:([0-9,\-]+)/g;
 
         while ((match = regex.exec(content)) !== null) {
             hasMatch = true;
-            groups.push({ lines: this.parseLineSpec(match[2]), color: this.getColorFromCode(match[1] || 'y') });
+            groups.push({ lines: this.parseLineSpec(match[2]), color: this.getColorFromCode(match[1] || '1') });
         }
         return hasMatch ? { groups, rawSpec: content } : null;
     }
 
     private getColorFromCode(code: string): ColorName {
-        return (({ 'y': 'yellow', 'r': 'red', 'g': 'green', 'b': 'blue' } as any)[code]) || 'yellow';
+        const map: Record<string, ColorName> = {
+            'y': 'yellow', '1': 'yellow',
+            'r': 'red',    '2': 'red',
+            'g': 'green',  '3': 'green',
+            'b': 'blue',   '4': 'blue',
+            '5': 'custom1',
+            '6': 'custom2',
+            '7': 'custom3'
+        };
+        return map[code] || 'yellow';
     }
 
     private parseLineSpec(spec: string): number[] {
