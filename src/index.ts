@@ -116,7 +116,7 @@ export default class LineHighlightPlugin extends Plugin {
     }
 
     private setupSettings() {
-        if (!this.setting) this.setting = new Setting({ confirmCallback: () => {} });
+        if (!this.setting) this.setting = new Setting({ confirmCallback: () => {}, height: '850px', width: '800px' });
 
         this.setting.addItem({
             title: '',
