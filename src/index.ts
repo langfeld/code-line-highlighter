@@ -42,7 +42,7 @@ export default class LineHighlightPlugin extends Plugin {
     };
 
     private colors: Record<string, ColorTheme> = {};
-    private config: { autoEnableLineNumber: boolean, defaultColor: string } = { autoEnableLineNumber: true, defaultColor: 'yellow' };
+    private config: { autoEnableLineNumber: boolean, defaultColor: string, useCommentStyle: boolean } = { autoEnableLineNumber: true, defaultColor: 'yellow', useCommentStyle: false };
 
     async onload() {
         console.log('LineHighlightPlugin: onload');
@@ -139,6 +139,19 @@ export default class LineHighlightPlugin extends Plugin {
                 container.appendChild(this.createElement('span', { marginLeft: '8px' }, {}, ['Automatically enable line numbers when adding highlights (Required for highlights to show properly)']));
 
                 wrapper.appendChild(container);
+
+                // Use Comment Style Checkbox
+                const commentWrapper = this.createElement('div', { display: 'flex', alignItems: 'center', width: '100%', marginTop: '10px' });
+                const commentSwitch = this.createElement('input', { cursor: 'pointer' }, { type: 'checkbox' });
+                if (this.config.useCommentStyle) commentSwitch.checked = true;
+                commentSwitch.addEventListener('change', async () => {
+                    this.config.useCommentStyle = commentSwitch.checked;
+                    await this.saveConfig();
+                });
+                commentWrapper.appendChild(commentSwitch);
+                commentWrapper.appendChild(this.createElement('span', { marginLeft: '8px' }, {}, ['Use legacy comment style (`// hl:1`) instead of attributes for context menu highlights']));
+                wrapper.appendChild(commentWrapper);
+
                 return wrapper;
             }
         });
@@ -397,15 +410,162 @@ export default class LineHighlightPlugin extends Plugin {
         const blockId = nodeElement?.getAttribute('data-node-id');
         if (!blockId) { showMessage('Cannot find block ID', 3000, 'error'); return; }
 
-        let groups = await this.getHighlightGroupsFromAttributes(blockId);
+        let groups: HighlightGroup[] = [];
+        if (this.config.useCommentStyle) {
+            groups = await this.getHighlightGroupsFromCommentSource(codeBlock);
+        } else {
+            groups = await this.getHighlightGroupsFromAttributes(blockId);
+        }
+
         groups = action(groups);
 
-        await this.saveHighlightGroupsToAttributes(blockId, groups, codeBlock);
+        if (this.config.useCommentStyle) {
+            await this.saveHighlightGroupsToCommentSource(blockId, groups, codeBlock);
+        } else {
+            await this.saveHighlightGroupsToAttributes(blockId, groups, codeBlock);
+        }
 
         // Immediate local update
         this.processCodeBlock(codeBlock);
 
         if (successMsg) showMessage(successMsg, 2000, 'info');
+    }
+
+    private async getHighlightGroupsFromCommentSource(codeBlock: HTMLElement): Promise<HighlightGroup[]> {
+         const firstLine = (codeBlock.querySelector('.hljs')?.textContent || '').split('\n')[0] || '';
+         const marker = this.parseHighlightMarker(firstLine);
+         return marker ? marker.groups : [];
+    }
+
+    private async saveHighlightGroupsToCommentSource(blockId: string, groups: HighlightGroup[], codeBlock: HTMLElement): Promise<void> {
+        console.log('LineHighlightPlugin: saveHighlightGroupsToCommentSource', blockId, groups);
+
+        const response = await fetchSyncPost('/api/block/getBlockKramdown', { id: blockId });
+        if (!response.data || !response.data.kramdown) return;
+
+        const kramdown = response.data.kramdown as string;
+        // Modified Regex to capture attributes (IAL) after the closing fence
+        const fenceMatch = kramdown.match(/^(\s*```)(\w+)?(\s*\n)([\s\S]*?)(\s*```)([\s\S]*)$/);
+
+        if (!fenceMatch) return;
+
+        const prefix = fenceMatch[1];
+        const lang = fenceMatch[2] || '';
+        const newline = fenceMatch[3];
+        const content = fenceMatch[4];
+        const closingFence = fenceMatch[5];
+        let attributes = fenceMatch[6]; // Change to let for modification
+
+        let lines = content.split('\n');
+        // Handle edge case where split adds empty string if content ends with newline
+        if (lines.length > 0 && content.endsWith('\n') && lines[lines.length - 1] === '') lines.pop();
+
+        const firstLine = lines[0] || '';
+        const marker = this.parseHighlightMarker(firstLine);
+        const hasHighlights = groups.length > 0;
+
+        const commentSyntax = this.getCommentSyntax(lang);
+
+        if (marker) {
+            // Existing marker found
+            if (hasHighlights) {
+                // Update marker
+                lines[0] = this.generateMarkerString(groups, commentSyntax);
+            } else {
+                // Remove marker
+                lines.shift();
+            }
+        } else {
+            // No existing marker
+             if (hasHighlights) {
+                 // SHIFT LOGIC: Creating new marker line shifts content down.
+                 // We must bump highlight indices by 1 so they match the new line positions.
+                 groups.forEach(g => g.lines = g.lines.map(l => l + 1));
+
+                 // Add new marker with shifted lines
+                 lines.unshift(this.generateMarkerString(groups, commentSyntax));
+             }
+        }
+
+        // Ensure linenumber attribute is present in IAL if needed
+        if (hasHighlights && this.config.autoEnableLineNumber) {
+            if (!attributes) {
+                // Should not happen as getBlockKramdown usually returns IAL with ID
+                attributes = '\n{: linenumber="true"}';
+            } else if (!attributes.includes('linenumber="true"')) {
+                // Add linenumber="true" to existing IAL
+                // IAL format: {: id="xxx" attr="yyy"}
+                // We replace the closing brace } with  linenumber="true"}
+                if (attributes.includes('}')) {
+                    attributes = attributes.replace('}', ' linenumber="true"}');
+                } else {
+                    // Fallback if malformed
+                    attributes += ' {: linenumber="true"}';
+                }
+            }
+        }
+
+        // Reconstruct code block
+        const newBody = lines.join('\n');
+
+        // Ensure proper separation: if closing fence doesn't start with a newline, add one.
+        const separator = /^\s*[\r\n]/.test(closingFence) ? '' : '\n';
+
+        const newKramdown = `${prefix}${lang}${newline}${newBody}${separator}${closingFence}${attributes}`;
+
+        await fetchSyncPost('/api/block/updateBlock', { id: blockId, dataType: 'markdown', data: newKramdown });
+
+        // Manually trigger processing because updateBlock might not trigger attribute observers the same way,
+        // but it triggers layout/render.
+        // Also enable line numbers if needed (via attributes, because that's separate from markers)
+        if (hasHighlights && this.config.autoEnableLineNumber) {
+            // Check if attribute is already set
+            const attrRes = await fetchSyncPost('/api/attr/getBlockAttrs', { id: blockId });
+            if (!attrRes.data?.linenumber) {
+                 await fetchSyncPost('/api/attr/setBlockAttrs', { id: blockId, attrs: { linenumber: 'true' } });
+            }
+
+            // CRITICAL FIX: Force UI update for line numbers
+            if (codeBlock) {
+                const nodeElement = codeBlock.closest('[data-node-id]') as HTMLElement;
+                if (nodeElement) {
+                    nodeElement.setAttribute('linenumber', 'true');
+                    const contentDiv = codeBlock.querySelector('.hljs div[contenteditable="true"]');
+                    if (contentDiv) {
+                        contentDiv.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                    }
+                    codeBlock.querySelector('.hljs')?.removeAttribute('data-render');
+                }
+            }
+        }
+    }
+
+    private getCommentSyntax(lang: string): { start: string, end: string } {
+        const l = lang.toLowerCase().trim();
+        if (['html', 'xml', 'svg', 'markdown', 'md'].includes(l)) return { start: '<!--', end: '-->' };
+        if (['css', 'less', 'scss', 'c'].includes(l)) return { start: '/*', end: '*/' };
+        if (['python', 'py', 'ruby', 'rb', 'perl', 'bash', 'sh', 'shell', 'yaml', 'yml', 'dockerfile', 'r', 'elixir'].includes(l)) return { start: '#', end: '' };
+        if (['lua', 'sql'].includes(l)) return { start: '--', end: '' };
+        if (['erlang', 'latex', 'tex'].includes(l)) return { start: '%', end: '' };
+        if (['clojure', 'lisp', 'scheme'].includes(l)) return { start: ';', end: '' };
+        if (['vim'].includes(l)) return { start: '"', end: '' };
+        return { start: '//', end: '' }; // Default (JS, TS, Java, C++, C#, Go, Rust, Swift, PHP...)
+    }
+
+    private generateMarkerString(groups: HighlightGroup[], syntax: { start: string, end: string }): string {
+        const parts: string[] = [];
+        groups.forEach(g => {
+            let code = 'hl'; // Default yellow
+            if (g.color === 'red') code = 'hlr';
+            else if (g.color === 'green') code = 'hlg';
+            else if (g.color === 'blue') code = 'hlb';
+            else if (g.color === 'custom1') code = 'hl5';
+            else if (g.color === 'custom2') code = 'hl6';
+            else if (g.color === 'custom3') code = 'hl7';
+            parts.push(`${code}:${this.formatLineSpec(g.lines)}`);
+        });
+        const inner = parts.join(';');
+        return `${syntax.start} ${inner} ${syntax.end}`.trim();
     }
 
     private async getHighlightGroupsFromAttributes(blockId: string): Promise<HighlightGroup[]> {
@@ -517,7 +677,7 @@ export default class LineHighlightPlugin extends Plugin {
         const contentRect = content.getBoundingClientRect();
         const padding = parseFloat(window.getComputedStyle(content).paddingLeft) || 0;
         const offset = (contentRect.left - rowRect.left) - padding;
-        const totalWidth = rowRect.width + Math.abs(offset) + contentRect.width - 10;
+        const totalWidth = rowRect.width + Math.abs(offset) + contentRect.width - 20;
 
         // CRITICAL FIX: Wrapper has 0 width to not affect layout, overlays have full width
         wrapper.style.width = '0px';
@@ -663,7 +823,7 @@ export default class LineHighlightPlugin extends Plugin {
         const contentRect = content.getBoundingClientRect();
         const padding = parseFloat(window.getComputedStyle(content).paddingLeft) || 0;
         const offset = (contentRect.left - rowRect.left) - padding;
-        const totalWidth = rowRect.width + Math.abs(offset) + contentRect.width - 10;
+        const totalWidth = rowRect.width + Math.abs(offset) + contentRect.width - 20;
 
         const wrapper = this.createElement('div',
             { position: 'absolute', left: '-10px', top: '0', width: '0px', height: '100%', pointerEvents: 'none', zIndex: '1', overflow: 'visible' },
@@ -687,31 +847,43 @@ export default class LineHighlightPlugin extends Plugin {
     }
 
     private parseHighlightMarker(line: string): { groups: HighlightGroup[], rawSpec: string } | null {
-        const content = ['//', '#', '<!--', '/*'].reduce((acc, p) => acc || (line.trim().startsWith(p) ? line.match(new RegExp(`^\\${p}\\s*(.+?)(?:\\s*\\*/|\\s*-->)?$`))?.[1]?.trim() || null : null), null as string | null);
-        if (!content) return null;
+        // Regex to detect various comment styles and extract inner content
+        // Supports: // ... | # ... | <!-- ... --> | /* ... */ | -- ... | % ... | ; ... | " ...
+        const commentRegex = /^\s*(?:\/\/|#|<!--|\/\*|--|%|;|")\s*(.+?)(?:\s*(?:\*\/|-->))?$/;
 
+        const contentMatch = line.trim().match(commentRegex);
+        if (!contentMatch) return null;
+
+        const content = contentMatch[1].trim();
         const groups: HighlightGroup[] = [];
         let hasMatch = false, match;
-        const regex = /hl([rgby1-7])?:([0-9,\-]+)/g;
+        // Regex to parse highlight parts like hl:1-3 or hl5:10
+        const regex = /hl([rgby]|1-7|c[1-3])?:([0-9,\-]+)/g;
 
         while ((match = regex.exec(content)) !== null) {
             hasMatch = true;
-            groups.push({ lines: this.parseLineSpec(match[2]), color: this.getColorFromCode(match[1] || '1') });
+            // Map code to color name
+            let colorCode = match[1] || 'y';
+            // Normalize legacy codes if needed, though they match regex groups
+            groups.push({ lines: this.parseLineSpec(match[2]), color: this.getColorFromCode(colorCode) });
         }
         return hasMatch ? { groups, rawSpec: content } : null;
     }
 
     private getColorFromCode(code: string): ColorName {
+        // Normalize input
+        const c = code.toLowerCase();
+
         const map: Record<string, ColorName> = {
-            'y': 'yellow', '1': 'yellow',
+            'y': 'yellow', '1': 'yellow', '': 'yellow',
             'r': 'red',    '2': 'red',
             'g': 'green',  '3': 'green',
             'b': 'blue',   '4': 'blue',
-            '5': 'custom1',
-            '6': 'custom2',
-            '7': 'custom3'
+            '5': 'custom1', 'c1': 'custom1',
+            '6': 'custom2', 'c2': 'custom2',
+            '7': 'custom3', 'c3': 'custom3'
         };
-        return map[code] || 'yellow';
+        return map[c] || 'yellow';
     }
 
     private parseLineSpec(spec: string): number[] {

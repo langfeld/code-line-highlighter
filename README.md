@@ -122,6 +122,7 @@ npm run build
 
 ## Changelog (recent)
 
+- v3.2.1 — Legacy highlight comment syntax can be used via context menu (option added)
 - v3.1.2 — Minor visual adjustments
 - v3.1.1 — Z-Index Fix
 - v3.1.0 — Custom colors for highlights and more improvements

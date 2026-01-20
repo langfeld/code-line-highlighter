@@ -122,6 +122,7 @@ npm run build
 
 ## Changelog (aktuell)
 
+- v3.2.1 — Legacy Highlight-Kommentar-Syntax kann per Kontext-Menü verwendet werden (Option hinzugefügt)
 - v3.1.2 — Kleinere optische Anpassungen
 - v3.1.1 — Z-Index Fix
 - v3.1.0 — Benutzerdefinierte Farben für Hervorhebungen und weitere Verbesserungen
