@@ -4,15 +4,17 @@ import "./index.css";
 // Type definitions
 interface HighlightGroup {
     lines: number[];
-    color: 'yellow' | 'red' | 'green' | 'blue';
+    color: string;
 }
 
 interface ColorTheme {
     background: string;
     border: string;
+    label?: string;
+    visible?: boolean;
 }
 
-const COLORS = ['yellow', 'red', 'green', 'blue'] as const;
+const COLORS = ['yellow', 'red', 'green', 'blue', 'custom1', 'custom2', 'custom3'] as const;
 type ColorName = typeof COLORS[number];
 
 export default class LineHighlightPlugin extends Plugin {
@@ -24,15 +26,19 @@ export default class LineHighlightPlugin extends Plugin {
 
     // Map colors to attribute names
     private readonly colorToAttr: Record<string, string> = {
-        'yellow': 'custom-hl', 'red': 'custom-hlr', 'green': 'custom-hlg', 'blue': 'custom-hlb'
+        'yellow': 'custom-hl', 'red': 'custom-hlr', 'green': 'custom-hlg', 'blue': 'custom-hlb',
+        'custom1': 'custom-hl-c1', 'custom2': 'custom-hl-c2', 'custom3': 'custom-hl-c3'
     };
 
     // Default color configurations
     private readonly defaultColors: Record<string, ColorTheme> = {
-        yellow: { background: 'rgba(255, 193, 7, 0.2)', border: '#ffc107' },
-        red: { background: 'rgba(244, 67, 54, 0.2)', border: '#f44336' },
-        green: { background: 'rgba(76, 175, 80, 0.2)', border: '#4caf50' },
-        blue: { background: 'rgba(33, 150, 243, 0.2)', border: '#2196f3' }
+        yellow: { background: 'rgba(255, 193, 7, 0.2)', border: '#ffc107', visible: true, label: 'Yellow' },
+        red: { background: 'rgba(244, 67, 54, 0.2)', border: '#f44336', visible: true, label: 'Red' },
+        green: { background: 'rgba(76, 175, 80, 0.2)', border: '#4caf50', visible: true, label: 'Green' },
+        blue: { background: 'rgba(33, 150, 243, 0.2)', border: '#2196f3', visible: true, label: 'Blue' },
+        custom1: { background: 'rgba(156, 39, 176, 0.2)', border: '#9c27b0', visible: false, label: 'Custom 1' },
+        custom2: { background: 'rgba(0, 188, 212, 0.2)', border: '#00bcd4', visible: false, label: 'Custom 2' },
+        custom3: { background: 'rgba(233, 30, 99, 0.2)', border: '#e91e63', visible: false, label: 'Custom 3' }
     };
 
     private colors: Record<string, ColorTheme> = {};
@@ -167,10 +173,25 @@ export default class LineHighlightPlugin extends Plugin {
                         }
                     });
 
+                    // Visible Checkbox
+                    const visibleCheck = this.createElement('input', { cursor: 'pointer' }, { type: 'checkbox' });
+                    if (this.colors[colorName].visible !== false) visibleCheck.checked = true;
+                    visibleCheck.addEventListener('change', async () => {
+                        this.colors[colorName].visible = visibleCheck.checked;
+                        await this.saveCustomColors();
+                    });
+
+                    // Label Input
+                    const labelInput = this.createElement('input', { width: '80px', height: '24px', border: '1px solid var(--b3-border-color)', padding: '0 4px', borderRadius: '4px' }, { type: 'text', value: this.colors[colorName].label || (colorName.charAt(0).toUpperCase() + colorName.slice(1)) });
+                    labelInput.addEventListener('change', async () => {
+                        this.colors[colorName].label = labelInput.value;
+                        await this.saveCustomColors();
+                    });
+
                     // Inputs
-                    const bgInput = this.createElement('input', { width: '50px', height: '30px', border: 'none', cursor: 'pointer' }, { type: 'color', value: this.rgbaToHex(this.colors[colorName].background) });
-                    const opacityInput = this.createElement('input', { width: '100px' }, { type: 'range', min: '0', max: '100', value: String(this.extractOpacity(this.colors[colorName].background) * 100) });
-                    const borderInput = this.createElement('input', { width: '50px', height: '30px', border: 'none', cursor: 'pointer' }, { type: 'color', value: this.colors[colorName].border });
+                    const bgInput = this.createElement('input', { width: '40px', height: '26px', border: 'none', cursor: 'pointer' }, { type: 'color', value: this.rgbaToHex(this.colors[colorName].background) });
+                    const opacityInput = this.createElement('input', { width: '80px' }, { type: 'range', min: '0', max: '100', value: String(this.extractOpacity(this.colors[colorName].background) * 100) });
+                    const borderInput = this.createElement('input', { width: '40px', height: '26px', border: 'none', cursor: 'pointer' }, { type: 'color', value: this.colors[colorName].border });
 
                     // Event Listeners
                     bgInput.addEventListener('change', async () => {
@@ -196,19 +217,25 @@ export default class LineHighlightPlugin extends Plugin {
                             bgInput.value = this.rgbaToHex(this.colors[colorName].background);
                             opacityInput.value = String(this.extractOpacity(this.colors[colorName].background) * 100);
                             borderInput.value = this.colors[colorName].border;
+                            labelInput.value = this.colors[colorName].label || colorName; // Reset label
+                            visibleCheck.checked = this.colors[colorName].visible !== false; // Reset visibility
                             await this.saveCustomColors();
                         }}, ['↺']
                     );
 
                     row.append(
                         this.createElement('div', { display: 'flex', flexDirection: 'column', alignItems: 'center', marginRight: '8px' }, {}, [
-                            this.createElement('span', { fontSize: '10px', color: 'var(--b3-theme-on-surface)' }, {}, ['Default']),
+                            this.createElement('span', { fontSize: '9px', color: 'var(--b3-theme-on-surface)' }, {}, ['Def']),
                             defaultRadio
                         ]),
-                        this.createElement('div', { minWidth: '80px', fontWeight: '500' }, {}, [colorName.charAt(0).toUpperCase() + colorName.slice(1)]),
-                        this.createElement('span', { fontSize: '12px', color: 'var(--b3-theme-on-surface)' }, {}, ['Background:']), bgInput,
-                        this.createElement('span', { fontSize: '12px', color: 'var(--b3-theme-on-surface)', marginLeft: '8px' }, {}, ['Opacity:']), opacityInput,
-                        this.createElement('span', { fontSize: '12px', color: 'var(--b3-theme-on-surface)', marginLeft: '8px' }, {}, ['Border:']), borderInput,
+                         this.createElement('div', { display: 'flex', flexDirection: 'column', alignItems: 'center', marginRight: '8px' }, {}, [
+                            this.createElement('span', { fontSize: '9px', color: 'var(--b3-theme-on-surface)' }, {}, ['Vis']),
+                            visibleCheck
+                        ]),
+                        labelInput, // Replaces static text
+                        this.createElement('span', { fontSize: '11px', color: 'var(--b3-theme-on-surface)' }, {}, ['BG:']), bgInput,
+                        this.createElement('span', { fontSize: '11px', color: 'var(--b3-theme-on-surface)', marginLeft: '4px' }, {}, ['Op:']), opacityInput,
+                        this.createElement('span', { fontSize: '11px', color: 'var(--b3-theme-on-surface)', marginLeft: '4px' }, {}, ['Bd:']), borderInput,
                         resetBtn
                     );
                     container.appendChild(row);
@@ -261,33 +288,38 @@ export default class LineHighlightPlugin extends Plugin {
         menu.addSeparator();
 
         const defaultColor = this.config.defaultColor || 'yellow';
+        const defaultColorName = this.colors[defaultColor]?.label || defaultColor.charAt(0).toUpperCase() + defaultColor.slice(1);
 
         // 1. Default Color Action (Quick Access)
         menu.addItem({
-            label: `Highlight ${label} (${defaultColor.charAt(0).toUpperCase() + defaultColor.slice(1)})`,
-            iconHTML: `<span style="color: ${this.colors[defaultColor].border};">●</span>`,
+            label: `Highlight ${label} (${defaultColorName})`,
+            iconHTML: `<span style="color: ${this.colors[defaultColor].border};">● </span>`,
             click: () => this.modifyBlockHighlights(codeBlock, (groups) => {
                 let group = groups.find(g => g.color === defaultColor);
                 if (!group) { group = { lines: [], color: defaultColor as any }; groups.push(group); }
                 for (let l = startLine; l <= endLine; l++) if (!group.lines.includes(l)) group.lines.push(l);
                 group.lines.sort((a, b) => a - b);
                 return groups;
-            }, `${label} highlighted in ${defaultColor}`)
+            }, `${label} highlighted in ${defaultColorName}`)
         });
 
-        // 2. Submenu with all colors
+        // 2. Submenu with all active colors
         const submenu: any[] = [];
         COLORS.forEach(color => {
+            // Only show visible colors
+            if (this.colors[color].visible === false) return;
+
+            const displayName = this.colors[color].label || color.charAt(0).toUpperCase() + color.slice(1);
             submenu.push({
-                label: `${color.charAt(0).toUpperCase() + color.slice(1)}`,
-                iconHTML: `<span style="color: ${this.colors[color].border};">●</span>`,
+                label: displayName,
+                iconHTML: `<span style="color: ${this.colors[color].border};">● </span>`,
                 click: () => this.modifyBlockHighlights(codeBlock, (groups) => {
                     let group = groups.find(g => g.color === color);
                     if (!group) { group = { lines: [], color }; groups.push(group); }
                     for (let l = startLine; l <= endLine; l++) if (!group.lines.includes(l)) group.lines.push(l);
                     group.lines.sort((a, b) => a - b);
                     return groups;
-                }, `${label} highlighted in ${color}`)
+                }, `${label} highlighted in ${displayName}`)
             });
         });
 
@@ -300,7 +332,7 @@ export default class LineHighlightPlugin extends Plugin {
 
         // 3. Remove Highlight Action
         menu.addItem({
-            label: `Remove highlight from ${label}`, iconHTML: '🚫',
+            label: `Remove highlight from ${label}`, iconHTML: '🚫 ',
             click: () => this.modifyBlockHighlights(codeBlock, (groups) => {
                 let removed = false;
                 for (let l = startLine; l <= endLine; l++) {
