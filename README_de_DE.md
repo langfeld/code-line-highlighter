@@ -122,6 +122,7 @@ npm run build
 
 ## Changelog (aktuell)
 
+- v3.1.1 — Z-Index Fix
 - v3.1.0 — Benutzerdefinierte Farben für Hervorhebungen und weitere Verbesserungen
 - v3.0.0 — Major Update: Kontextmenü, Mehrzeilenauswahl, Farbanpassung, Speicherung in Block-Attributen
 - v2.1.4 — Verhindert doppelte Overlays beim Öffnen von Notizen
