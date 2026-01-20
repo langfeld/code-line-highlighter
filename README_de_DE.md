@@ -1,28 +1,44 @@
-# SiYuan Zeilen-Hervorhebung Plugin
+# SiYuan Code Line Highlighter Plugin
 
-Hebe spezifische Code-Zeilen in SiYuan Code-Blöcken mit kompakter Kommentar-Syntax und Mehrfarben-Unterstützung hervor.
+Hebe bestimmte Codezeilen in SiYuan-Codeblöcken hervor — per intuitivem Kontextmenü oder per Kommentar-Syntax. Unterstützt mehrere Farben und anpassbare Einstellungen.
 
 ## Verwendung
 
-Füge einen Kommentar in der **ersten Zeile** deines Code-Blocks ein:
+### Methode 1: Kontextmenü (Neu in v3.0.0)
+
+Rechtsklicke einfach auf eine Zeile (oder markiere mehrere Zeilen) in einem Codeblock, um:
+- Eine oder mehrere Zeilen in einer gewählten Farbe hervorzuheben (gelb, rot, grün, blau)
+- Bestehende Hervorhebungen von einer oder mehreren Zeilen zu entfernen
+
+Mehrere Zeilen auswählen: Markiere z. B. Zeilen 3–10 und rechtsklicke, um alle auf einmal zu markieren.
+
+Dies ist die empfohlene Methode, da sie:
+- Hervorhebungen in Block-Attributen speichert (verändert nicht deinen Code)
+- Mit jeder Programmiersprache funktioniert
+- Eine visuelle, benutzerfreundliche Oberfläche bietet
+- Mehrfachauswahl von Zeilen unterstützt
+
+### Methode 2: Kommentar-Syntax (Legacy, weiterhin unterstützt)
+
+Füge einen Kommentar in die **erste Zeile** deines Codeblocks ein:
 
 ```javascript
 // hl:1,3-5
-const foo = "Zeile 1 - gelb hervorgehoben";
-const bar = "Zeile 2 - normal";
-const baz = "Zeile 3 - gelb hervorgehoben";
-const qux = "Zeile 4 - gelb hervorgehoben";
-const test = "Zeile 5 - gelb hervorgehoben";
+const foo = "line 1 - highlighted yellow";
+const bar = "line 2 - normal";
+const baz = "line 3 - highlighted yellow";
+const qux = "line 4 - highlighted yellow";
+const test = "line 5 - highlighted yellow";
 ```
 
-### Mehrfarben-Syntax
+#### Mehrfarben-Syntax
 
 - `hl:` (Standard) — gelb
 - `hlr:` — rot
 - `hlg:` — grün
 - `hlb:` — blau
 
-Kombiniere mehrere Farben mit `;`:
+Mehrere Farben mit `;` kombinieren:
 
 ```javascript
 // hlr:1;hlg:3;hlb:5-7
@@ -35,7 +51,7 @@ const note2 = "Zeile 6 - blau";
 const note3 = "Zeile 7 - blau";
 ```
 
-### Unterstützte Kommentar-Syntaxen
+#### Unterstützte Kommentar-Syntaxen
 
 - `// ...` (JavaScript, TypeScript, C++, Java, etc.)
 - `# ...` (Python, Ruby, Bash, etc.)
@@ -44,26 +60,42 @@ const note3 = "Zeile 7 - blau";
 
 ## Features
 
-- ✅ Nicht-invasive Overlays (werden nicht im Notiz-Inhalt gespeichert)
+- ✅ Kontextmenü-Integration — Rechtsklick zum Hervorheben/Entfernen
+- ✅ Mehrzeilenauswahl — Markiere und hebe mehrere Zeilen gleichzeitig hervor (z. B. 3–10)
+- ✅ Anpassbare Farben — Farben (Hintergrund, Rahmen, Opazität) in den Einstellungen ändern
+- ✅ Speicherung in Block-Attributen — Hervorhebungen werden nicht in den Code geschrieben
+- ✅ Nicht-invasive Overlays (nicht im Notizinhalt gespeichert)
 - ✅ Mehrfarben-Unterstützung (gelb, rot, grün, blau)
-- ✅ Reagiert auf Fenster-Größenänderung und Code-Bearbeitung
-- ✅ Funktioniert mit SiYuans nativer Syntax-Hervorhebung
+- ✅ Reagiert auf Fenstergrößenänderung und Code-Edit
+- ✅ Funktioniert mit SiYuans nativer Syntax-Highlighting
+- ✅ Rückwärtskompatibel mit Kommentar-Syntax
+
+## Anpassung
+
+Öffne die Plugin-Einstellungen, um Hervorhebungsfarben zu personalisieren:
+1. Einstellungen → Plugins → Code Line Highlighter → Settings
+2. Passe jede Farbe an (gelb, rot, grün, blau):
+	- Hintergrundfarbe: Farbwähler
+	- Opazität: Transparenz von 0–100 %
+	- Rahmenfarbe: Akzent-/Border-Farbe
+3. Einzelne Reset-Buttons oder „Alle Farben auf Standard zurücksetzen“ nutzen
+4. Änderungen werden sofort auf alle hervorgehobenen Codeblöcke angewendet
 
 ## Installation
 
-### Über den Marktplatz (empfohlen)
+### Aus dem Marketplace (empfohlen)
 
-1. SiYuan öffnen → Einstellungen → Marktplatz → Plugins
-2. Nach "Code Line Highlighter" suchen
+1. SiYuan → Einstellungen → Marketplace → Plugins öffnen
+2. Nach „Code Line Highlighter“ suchen
 3. Auf Installieren klicken
 
 ### Manuelle Installation
 
-1. `package.zip` von [Releases](https://github.com/langfeld/code-line-highlighter/releases) herunterladen
+1. `package.zip` von den Releases herunterladen: https://github.com/langfeld/code-line-highlighter/releases
 2. Nach `{SiYuan}/data/plugins/code-line-highlighter` entpacken
-3. SiYuan neustarten
+3. SiYuan neu starten
 
-### Build aus dem Quellcode
+### Aus dem Quellcode bauen
 
 ```bash
 npm install
@@ -73,42 +105,10 @@ npm run build
 
 ## Changelog (aktuell)
 
+- v3.0.0 — Major Update: Kontextmenü, Mehrzeilenauswahl, Farbanpassung, Speicherung in Block-Attributen
 - v2.1.4 — Verhindert doppelte Overlays beim Öffnen von Notizen
-- v2.1.3 — Bessere Re-Render-Erkennung wenn Overlays fehlen
-- v2.1.2 — Input-Listener für Code-Bearbeitungs-Erkennung
-
-## Lizenz
-
-MIT
-
-## Syntax
-
-- `hl:1` - Hebt Zeile 1 hervor
-- `hl:1,3` - Hebt Zeilen 1 und 3 hervor
-- `hl:1-5` - Hebt Zeilen 1 bis 5 hervor
-- `hl:1,3-5,8` - Kombination aus einzelnen Zeilen und Bereichen
-
-## Unterstützte Kommentar-Syntaxen
-
-- `// hl:...` (JavaScript, TypeScript, C++, Java, etc.)
-- `# hl:...` (Python, Ruby, Bash, etc.)
-- `<!-- hl:... -->` (HTML, XML)
-- `/* hl:... */` (CSS, C)
-
-## Features
-
-- ✅ Funktioniert mit SiYuans nativem Syntax-Highlighting
-- ✅ Einfacher, nicht-invasiver Ansatz
-- ✅ Unterstützt mehrere Sprachen
-- ✅ Visuelle Zeilen-Hervorhebung mit linkem Border
-- ✅ Automatische Erkennung und Anwendung
-
-## Installation
-
-1. Lade `package.zip` herunter
-2. Extrahiere nach `{SiYuan}/data/plugins/`
-3. Starte SiYuan neu
-4. Aktiviere das Plugin in Einstellungen → Marktplatz → Heruntergeladen
+- v2.1.3 — Verbesserte Re-Render-Erkennung, wenn Overlays fehlen
+- v2.1.2 — Input-Listener zur Erkennung von Code-Änderungen
 
 ## Lizenz
 

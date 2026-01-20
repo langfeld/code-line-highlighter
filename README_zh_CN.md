@@ -12,71 +12,118 @@ const foo = "第1行 - 黄色高亮";
 const bar = "第2行 - 正常";
 const baz = "第3行 - 黄色高亮";
 const qux = "第4行 - 黄色高亮";
-const test = "第5行 - 黄色高亮";
+# SiYuan 代码行高亮 插件
+
+在 SiYuan 的代码块中通过直观的右键菜单或注释语法高亮指定代码行，支持多种颜色与可配置颜色设置。
+
+## 使用方法
+
+### 方法一：右键菜单（v3.0.0 新增）
+
+在代码块内对任意一行右击（或选中多行）即可：
+- 以你选择的颜色（黄色、红色、绿色、蓝色）高亮单行或多行
+- 移除已选中行的高亮
+
+多行选择：选中例如第 3–10 行并右键，可一次性高亮全部选中行。
+
+推荐使用此方法，因为它：
+- 将高亮存储为区块属性（不会改动代码）
+- 适用于任意编程语言
+- 提供可视化的用户界面
+- 支持多行选择
+
+### 方法二：注释语法（遗留支持）
+
+在代码块的**第一行**添加注释说明：
+
+```javascript
+// hl:1,3-5
+const foo = "line 1 - highlighted yellow";
+const bar = "line 2 - normal";
+const baz = "line 3 - highlighted yellow";
+const qux = "line 4 - highlighted yellow";
+const test = "line 5 - highlighted yellow";
 ```
 
-### 多色高亮语法
+#### 多色语法
 
-- `hl:` (默认) — 黄色
+- `hl:`（默认）— 黄色
 - `hlr:` — 红色
 - `hlg:` — 绿色
 - `hlb:` — 蓝色
 
-使用 `;` 组合多种颜色：
+用 `;` 组合多种颜色：
 
 ```javascript
 // hlr:1;hlg:3;hlb:5-7
-const error = "第1行 - 红色";
-const normal = "第2行 - 正常";
-const success = "第3行 - 绿色";
-const info = "第4行 - 正常";
-const note1 = "第5行 - 蓝色";
-const note2 = "第6行 - 蓝色";
-const note3 = "第7行 - 蓝色";
+const error = "line 1 - red";
+const normal = "line 2 - normal";
+const success = "line 3 - green";
+const info = "line 4 - normal";
+const note1 = "line 5 - blue";
+const note2 = "line 6 - blue";
+const note3 = "line 7 - blue";
 ```
 
-### 支持的注释语法
+#### 支持的注释语法
 
-- `// ...` (JavaScript, TypeScript, C++, Java 等)
-- `# ...` (Python, Ruby, Bash 等)
-- `<!-- ... -->` (HTML, XML)
-- `/* ... */` (CSS, C 等)
+- `// ...`（JavaScript、TypeScript、C++、Java 等）
+- `# ...`（Python、Ruby、Bash 等）
+- `<!-- ... -->`（HTML、XML）
+- `/* ... */`（CSS、C）
 
-## 功能特性
+## 特性
 
-- ✅ 非侵入式覆盖层（不会保存到笔记内容）
-- ✅ 多色支持（黄色、红色、绿色、蓝色）
-- ✅ 响应式（窗口大小改变和代码编辑时自动更新）
-- ✅ 与 SiYuan 原生语法高亮兼容
+- ✅ 右键菜单集成 — 通过右键高亮/取消高亮
+- ✅ 多行选择 — 选中并一次性高亮多行（例如第 3–10 行）
+- ✅ 可自定义颜色 — 在设置中修改颜色（背景、边框、不透明度）
+- ✅ 以区块属性存储 — 高亮不会写入代码内容
+- ✅ 非侵入性覆盖层（不保存到笔记内容）
+- ✅ 多色支持（黄、红、绿、蓝）
+- ✅ 响应窗口大小变化与代码编辑
+- ✅ 与 SiYuan 的原生日语法高亮兼容
+- ✅ 向后兼容注释语法
 
-## 安装方式
+## 自定义
+
+打开插件设置以自定义高亮颜色：
+1. 设置 → 插件 → Code Line Highlighter → Settings
+2. 自定义每种颜色（黄、红、绿、蓝）：
+	- 背景颜色：颜色选择器
+	- 不透明度：0–100%
+	- 边框颜色：边框/强调颜色
+3. 使用单项重置或“全部颜色恢复默认”按钮
+4. 修改会立即应用到所有高亮的代码块
+
+## 安装
 
 ### 从市场安装（推荐）
 
-1. 打开 SiYuan → 设置 → 市场 → 插件
-2. 搜索"代码行高亮"
+1. 打开 SiYuan → 设置 → Marketplace → Plugins
+2. 搜索 “Code Line Highlighter”
 3. 点击安装
 
 ### 手动安装
 
-1. 从 [Releases](https://github.com/langfeld/code-line-highlighter/releases) 下载 `package.zip`
+1. 从 Releases 下载 `package.zip`: https://github.com/langfeld/code-line-highlighter/releases
 2. 解压到 `{SiYuan}/data/plugins/code-line-highlighter`
 3. 重启 SiYuan
 
-### 从源代码构建
+### 从源码构建
 
 ```bash
 npm install
 npm run build
-# package.zip 将在项目根目录下生成
+# package.zip 将在项目根目录生成
 ```
 
-## 更新日志（最近版本）
+## 更新日志（近期）
 
-- v2.1.4 — 防止打开笔记时出现重复的覆盖层
-- v2.1.3 — 改进覆盖层缺失时的重新渲染检测
+- v3.0.0 — 重大更新：右键菜单、多行选择、颜色自定义、区块属性存储
+- v2.1.4 — 防止打开笔记时产生重复覆盖层
+- v2.1.3 — 当覆盖层缺失时改进重渲染检测
 - v2.1.2 — 为代码编辑检测添加输入监听器
 
-## 许可证
+## 许可
 
 MIT
