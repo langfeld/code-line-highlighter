@@ -2,7 +2,7 @@
   "name": "code-line-highlighter",
   "author": "Langfeld",
   "url": "https://github.com/langfeld/code-line-highlighter",
-  "version": "2.1.4",
+  "version": "3.0.0",
   "minAppVersion": "3.0.0",
   "backends": ["all"],
   "frontends": ["all"],

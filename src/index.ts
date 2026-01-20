@@ -1,5 +1,8 @@
 import {
-    Plugin
+    Plugin,
+    fetchSyncPost,
+    showMessage,
+    Setting
 } from "siyuan";
 import "./index.css";
 
@@ -21,16 +24,30 @@ export default class LineHighlightPlugin extends Plugin {
     private resizeObserver: ResizeObserver | null = null;
     private inputListeners: WeakMap<HTMLElement, (e: Event) => void> = new WeakMap();
 
-    // Color definitions
-    private readonly colors: Record<string, ColorTheme> = {
+    // Map colors to attribute names
+    private readonly colorToAttr: Record<string, string> = {
+        'yellow': 'custom-hl',
+        'red': 'custom-hlr',
+        'green': 'custom-hlg',
+        'blue': 'custom-hlb'
+    };
+
+    // Default color configurations
+    private readonly defaultColors: Record<string, ColorTheme> = {
         yellow: { background: 'rgba(255, 193, 7, 0.2)', border: '#ffc107' },
         red: { background: 'rgba(244, 67, 54, 0.2)', border: '#f44336' },
         green: { background: 'rgba(76, 175, 80, 0.2)', border: '#4caf50' },
         blue: { background: 'rgba(33, 150, 243, 0.2)', border: '#2196f3' }
     };
 
-    onload() {
-        // console.log("✅ Code Line Highlighter Plugin loaded - Version 2.1.4 - Prevents duplicates!");
+    // Current color configurations (initialized from defaults, can be customized)
+    private colors: Record<string, ColorTheme> = {};
+
+    async onload() {
+        // console.log("✅ Code Line Highlighter Plugin loaded - Version 3.0.0");
+
+        // Load custom colors from storage
+        await this.loadCustomColors();
 
         // CRITICAL: Monitor for overlays being added to code blocks and remove them!
         this.startCleanupObserver();
@@ -54,6 +71,753 @@ export default class LineHighlightPlugin extends Plugin {
         setTimeout(() => {
             this.observeCodeBlocks();
         }, 600);
+
+        // Add context menu listener for right-click on code blocks
+        this.eventBus.on("open-menu-content", this.handleContextMenu.bind(this));
+    }
+
+    /**
+     * Called after layout is ready - setup settings panel here
+     */
+    onLayoutReady() {
+        // Setup settings panel (must be done after layout is ready)
+        this.setupSettings();
+    }
+
+    /**
+     * Load custom colors from storage
+     */
+    private async loadCustomColors() {
+        try {
+            const customColors = await this.loadData('colors.json');
+            // Start with defaults, then override with custom colors
+            this.colors = { ...this.defaultColors };
+            if (customColors) {
+                Object.assign(this.colors, customColors);
+            }
+        } catch (error) {
+            console.error('Error loading custom colors:', error);
+            // Fallback to defaults on error
+            this.colors = { ...this.defaultColors };
+        }
+    }
+
+    /**
+     * Save custom colors to storage
+     */
+    private async saveCustomColors() {
+        try {
+            await this.saveData('colors.json', this.colors);
+            // Re-process all code blocks to apply new colors
+            this.processAllCodeBlocks();
+        } catch (error) {
+            console.error('Error saving custom colors:', error);
+        }
+    }
+
+    /**
+     * Setup settings panel
+     */
+    private setupSettings() {
+        // Initialize the setting object if not already done
+        if (!this.setting) {
+            this.setting = new Setting({
+                confirmCallback: () => {
+                    // Settings are auto-saved when changed, no need for explicit confirm
+                }
+            });
+        }
+
+        this.setting.addItem({
+            title: 'Highlight Colors',
+            description: 'Customize the colors used for code line highlighting',
+            direction: 'row',
+            createActionElement: () => {
+                const container = document.createElement('div');
+                container.style.cssText = 'display: flex; flex-direction: column; gap: 16px; width: 100%;';
+
+                const colorNames: Array<'yellow' | 'red' | 'green' | 'blue'> = ['yellow', 'red', 'green', 'blue'];
+                
+                colorNames.forEach(colorName => {
+                    const colorRow = document.createElement('div');
+                    colorRow.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 8px; border: 1px solid var(--b3-border-color); border-radius: 4px;';
+                    colorRow.setAttribute('data-color-name', colorName);
+
+                    // Color name label
+                    const label = document.createElement('div');
+                    label.textContent = colorName.charAt(0).toUpperCase() + colorName.slice(1);
+                    label.style.cssText = 'min-width: 80px; font-weight: 500;';
+                    colorRow.appendChild(label);
+
+                    // Background color picker
+                    const bgLabel = document.createElement('span');
+                    bgLabel.textContent = 'Background:';
+                    bgLabel.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface);';
+                    colorRow.appendChild(bgLabel);
+
+                    const bgInput = document.createElement('input');
+                    bgInput.type = 'color';
+                    bgInput.value = this.rgbaToHex(this.colors[colorName].background);
+                    bgInput.style.cssText = 'width: 50px; height: 30px; border: none; cursor: pointer;';
+                    bgInput.setAttribute('data-input-type', 'background');
+                    bgInput.addEventListener('change', async () => {
+                        const opacity = this.extractOpacity(this.colors[colorName].background);
+                        this.colors[colorName].background = this.hexToRgba(bgInput.value, opacity);
+                        await this.saveCustomColors();
+                    });
+                    colorRow.appendChild(bgInput);
+
+                    // Opacity slider
+                    const opacityLabel = document.createElement('span');
+                    opacityLabel.textContent = 'Opacity:';
+                    opacityLabel.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); margin-left: 8px;';
+                    colorRow.appendChild(opacityLabel);
+
+                    const opacityInput = document.createElement('input');
+                    opacityInput.type = 'range';
+                    opacityInput.min = '0';
+                    opacityInput.max = '100';
+                    opacityInput.value = String(this.extractOpacity(this.colors[colorName].background) * 100);
+                    opacityInput.style.cssText = 'width: 100px;';
+                    opacityInput.setAttribute('data-input-type', 'opacity');
+                    opacityInput.addEventListener('input', async () => {
+                        const opacity = parseFloat(opacityInput.value) / 100;
+                        const hex = this.rgbaToHex(this.colors[colorName].background);
+                        this.colors[colorName].background = this.hexToRgba(hex, opacity);
+                        await this.saveCustomColors();
+                    });
+                    colorRow.appendChild(opacityInput);
+
+                    // Border color picker
+                    const borderLabel = document.createElement('span');
+                    borderLabel.textContent = 'Border:';
+                    borderLabel.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); margin-left: 8px;';
+                    colorRow.appendChild(borderLabel);
+
+                    const borderInput = document.createElement('input');
+                    borderInput.type = 'color';
+                    borderInput.value = this.colors[colorName].border;
+                    borderInput.style.cssText = 'width: 50px; height: 30px; border: none; cursor: pointer;';
+                    borderInput.setAttribute('data-input-type', 'border');
+                    borderInput.addEventListener('change', async () => {
+                        this.colors[colorName].border = borderInput.value;
+                        await this.saveCustomColors();
+                    });
+                    colorRow.appendChild(borderInput);
+
+                    // Reset button
+                    const resetBtn = document.createElement('button');
+                    resetBtn.textContent = '↺';
+                    resetBtn.title = 'Reset to default';
+                    resetBtn.style.cssText = 'padding: 4px 8px; margin-left: auto; cursor: pointer; border: 1px solid var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-background);';
+                    resetBtn.addEventListener('click', async () => {
+                        this.colors[colorName] = { ...this.defaultColors[colorName] };
+                        bgInput.value = this.rgbaToHex(this.colors[colorName].background);
+                        opacityInput.value = String(this.extractOpacity(this.colors[colorName].background) * 100);
+                        borderInput.value = this.colors[colorName].border;
+                        await this.saveCustomColors();
+                    });
+                    colorRow.appendChild(resetBtn);
+
+                    container.appendChild(colorRow);
+                });
+
+                // Reset all button
+                const resetAllBtn = document.createElement('button');
+                resetAllBtn.textContent = 'Reset All Colors to Default';
+                resetAllBtn.style.cssText = 'padding: 8px 16px; cursor: pointer; border: 1px solid var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-background); margin-top: 8px;';
+                resetAllBtn.addEventListener('click', async () => {
+                    // Reset all colors to defaults
+                    this.colors = { ...this.defaultColors };
+                    
+                    // Update all UI elements
+                    colorNames.forEach(colorName => {
+                        const colorRow = container.querySelector(`[data-color-name="${colorName}"]`) as HTMLElement;
+                        if (colorRow) {
+                            const bgInput = colorRow.querySelector('[data-input-type="background"]') as HTMLInputElement;
+                            const opacityInput = colorRow.querySelector('[data-input-type="opacity"]') as HTMLInputElement;
+                            const borderInput = colorRow.querySelector('[data-input-type="border"]') as HTMLInputElement;
+                            
+                            if (bgInput) bgInput.value = this.rgbaToHex(this.colors[colorName].background);
+                            if (opacityInput) opacityInput.value = String(this.extractOpacity(this.colors[colorName].background) * 100);
+                            if (borderInput) borderInput.value = this.colors[colorName].border;
+                        }
+                    });
+                    
+                    await this.saveCustomColors();
+                });
+                container.appendChild(resetAllBtn);
+
+                return container;
+            }
+        });
+    }
+
+    /**
+     * Convert rgba string to hex color
+     */
+    private rgbaToHex(rgba: string): string {
+        const match = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
+        if (!match) return '#000000';
+        
+        const r = parseInt(match[1]);
+        const g = parseInt(match[2]);
+        const b = parseInt(match[3]);
+        
+        return '#' + [r, g, b].map(x => {
+            const hex = x.toString(16);
+            return hex.length === 1 ? '0' + hex : hex;
+        }).join('');
+    }
+
+    /**
+     * Convert hex color to rgba with opacity
+     */
+    private hexToRgba(hex: string, opacity: number): string {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    }
+
+    /**
+     * Extract opacity from rgba string
+     */
+    private extractOpacity(rgba: string): number {
+        // Handle rgba() format with alpha channel
+        const rgbaMatch = rgba.match(/rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)/);
+        if (rgbaMatch) {
+            return parseFloat(rgbaMatch[1]);
+        }
+        
+        // Handle rgb() format without alpha (default to 0.2)
+        const rgbMatch = rgba.match(/rgb\([^,]+,[^,]+,[^,]+\)/);
+        if (rgbMatch) {
+            return 0.2;
+        }
+        
+        // Fallback
+        return 0.2;
+    }
+
+    /**
+     * Handle context menu for code blocks
+     */
+    private handleContextMenu(event: CustomEvent<any>) {
+        const detail = event.detail;
+        const { menu, protyle, element, range } = detail;
+
+        // Check if the selection is inside a code block
+        const codeBlock = element?.closest('.code-block') as HTMLElement;
+        if (!codeBlock) {
+            return;
+        }
+
+        // Calculate which lines are selected
+        const lineRange = this.getLineRangeFromSelection(codeBlock, range);
+        if (lineRange === null) {
+            return;
+        }
+
+        const { startLine, endLine } = lineRange;
+        const isMultiLine = startLine !== endLine;
+        const lineLabel = isMultiLine ? `lines ${startLine}-${endLine}` : `line ${startLine}`;
+
+        // Add separator
+        menu.addSeparator();
+
+        // Add highlight submenu
+        const highlightMenu = {
+            label: `Highlight ${lineLabel}`,
+            iconHTML: '🎨',
+            submenu: [
+                {
+                    label: 'Yellow',
+                    iconHTML: `<span style="color: ${this.colors.yellow.border};">●</span>`,
+                    click: () => this.toggleHighlightRange(codeBlock, startLine, endLine, 'yellow')
+                },
+                {
+                    label: 'Red',
+                    iconHTML: `<span style="color: ${this.colors.red.border};">●</span>`,
+                    click: () => this.toggleHighlightRange(codeBlock, startLine, endLine, 'red')
+                },
+                {
+                    label: 'Green',
+                    iconHTML: `<span style="color: ${this.colors.green.border};">●</span>`,
+                    click: () => this.toggleHighlightRange(codeBlock, startLine, endLine, 'green')
+                },
+                {
+                    label: 'Blue',
+                    iconHTML: `<span style="color: ${this.colors.blue.border};">●</span>`,
+                    click: () => this.toggleHighlightRange(codeBlock, startLine, endLine, 'blue')
+                }
+            ]
+        };
+
+        menu.addItem(highlightMenu);
+
+        // Add remove highlight option
+        menu.addItem({
+            label: `Remove highlight from ${lineLabel}`,
+            iconHTML: '🚫',
+            click: () => this.removeHighlightFromLineRange(codeBlock, startLine, endLine)
+        });
+    }
+
+    /**
+     * Get line range from selection (supports multi-line selection)
+     */
+    private getLineRangeFromSelection(codeBlock: HTMLElement, range: Range): { startLine: number, endLine: number } | null {
+        if (!range) {
+            return null;
+        }
+
+        const hljsElement = codeBlock.querySelector('.hljs');
+        if (!hljsElement) {
+            return null;
+        }
+
+        const codeContentDiv = hljsElement.querySelector('div[contenteditable="true"]') as HTMLElement;
+        if (!codeContentDiv) {
+            return null;
+        }
+
+        // Get the text content
+        const textContent = codeContentDiv.textContent || '';
+        const lines = textContent.split('\n');
+
+        // Helper function to calculate line number from offset
+        const getLineFromOffset = (offset: number): number => {
+            let currentOffset = 0;
+            for (let i = 0; i < lines.length; i++) {
+                currentOffset += lines[i].length + 1; // +1 for newline
+                if (offset < currentOffset) {
+                    return i + 1; // Line numbers are 1-based
+                }
+            }
+            return lines.length;
+        };
+
+        // Calculate start offset
+        const startOffset = this.calculateOffset(range.startContainer, range.startOffset, codeContentDiv);
+        if (startOffset === null) {
+            return null;
+        }
+
+        // Calculate end offset
+        const endOffset = this.calculateOffset(range.endContainer, range.endOffset, codeContentDiv);
+        if (endOffset === null) {
+            return null;
+        }
+
+        const startLine = getLineFromOffset(startOffset);
+        const endLine = getLineFromOffset(endOffset);
+
+        return { startLine, endLine };
+    }
+
+    /**
+     * Calculate offset from the start of contenteditable element
+     */
+    private calculateOffset(node: Node, offset: number, codeContentDiv: HTMLElement): number | null {
+        let startNode = node;
+        
+        // If startNode is not a text node, try to get a text node
+        if (startNode.nodeType !== Node.TEXT_NODE) {
+            const walker = document.createTreeWalker(
+                startNode,
+                NodeFilter.SHOW_TEXT,
+                null
+            );
+            const textNode = walker.nextNode();
+            if (!textNode) {
+                // If no text node found, can't determine offset
+                console.warn('Could not find text node for offset calculation');
+                return null;
+            }
+            startNode = textNode;
+        }
+
+        // Calculate offset from the start of contenteditable
+        let totalOffset = offset;
+        let currentNode: Node | null = startNode;
+
+        // Walk backwards to calculate total offset
+        while (currentNode && currentNode !== codeContentDiv) {
+            const prevSibling: Node | null = currentNode.previousSibling;
+            if (prevSibling) {
+                totalOffset += prevSibling.textContent?.length || 0;
+                currentNode = prevSibling;
+            } else {
+                currentNode = currentNode.parentNode;
+                if (currentNode === codeContentDiv) {
+                    break;
+                }
+            }
+        }
+
+        return totalOffset;
+    }
+
+    /**
+     * Get line number from cursor/selection position (legacy method, kept for compatibility)
+     */
+    private getLineNumberFromRange(codeBlock: HTMLElement, range: Range): number | null {
+        if (!range) {
+            return null;
+        }
+
+        const hljsElement = codeBlock.querySelector('.hljs');
+        if (!hljsElement) {
+            return null;
+        }
+
+        const codeContentDiv = hljsElement.querySelector('div[contenteditable="true"]') as HTMLElement;
+        if (!codeContentDiv) {
+            return null;
+        }
+
+        // Get the text content and calculate line number from cursor position
+        const textContent = codeContentDiv.textContent || '';
+        const lines = textContent.split('\n');
+
+        // Find the line containing the range start
+        let startNode = range.startContainer;
+        
+        // If startNode is not a text node, try to get a text node
+        if (startNode.nodeType !== Node.TEXT_NODE) {
+            const walker = document.createTreeWalker(
+                startNode,
+                NodeFilter.SHOW_TEXT,
+                null
+            );
+            const textNode = walker.nextNode();
+            if (!textNode) {
+                // If no text node found, can't determine line number
+                console.warn('Could not find text node for line number calculation');
+                return null;
+            }
+            startNode = textNode;
+        }
+
+        // Calculate offset from the start of contenteditable
+        let offset = range.startOffset;
+        let currentNode: Node | null = startNode;
+
+        // Walk backwards to calculate total offset
+        while (currentNode && currentNode !== codeContentDiv) {
+            const prevSibling: Node | null = currentNode.previousSibling;
+            if (prevSibling) {
+                offset += prevSibling.textContent?.length || 0;
+                currentNode = prevSibling;
+            } else {
+                currentNode = currentNode.parentNode;
+                if (currentNode === codeContentDiv) {
+                    break;
+                }
+            }
+        }
+
+        // Calculate line number from offset
+        let currentOffset = 0;
+        for (let i = 0; i < lines.length; i++) {
+            currentOffset += lines[i].length + 1; // +1 for newline
+            if (offset < currentOffset) {
+                return i + 1; // Line numbers are 1-based
+            }
+        }
+
+        return lines.length;
+    }
+
+    /**
+     * Toggle highlight for a specific line with a color
+     */
+    private async toggleHighlight(codeBlock: HTMLElement, lineNumber: number, color: 'yellow' | 'red' | 'green' | 'blue') {
+        const nodeElement = codeBlock.closest('[data-node-id]') as HTMLElement;
+        if (!nodeElement) {
+            showMessage('Cannot find block ID', 3000, 'error');
+            return;
+        }
+
+        const blockId = nodeElement.getAttribute('data-node-id');
+        if (!blockId) {
+            showMessage('Cannot find block ID', 3000, 'error');
+            return;
+        }
+
+        // Get current highlights from attributes
+        const groups = await this.getHighlightGroupsFromAttributes(blockId);
+
+        // Find the group for this color
+        let group = groups.find(g => g.color === color);
+        if (!group) {
+            group = { lines: [], color };
+            groups.push(group);
+        }
+
+        // Add line if not already present
+        if (!group.lines.includes(lineNumber)) {
+            group.lines.push(lineNumber);
+            group.lines.sort((a, b) => a - b);
+        }
+
+        // Save to attributes
+        await this.saveHighlightGroupsToAttributes(blockId, groups);
+
+        // Re-process the code block to apply changes (fire and forget)
+        this.processCodeBlock(codeBlock).catch(err => {
+            console.error('Error processing code block:', err);
+        });
+
+        showMessage(`Line ${lineNumber} highlighted in ${color}`, 2000, 'info');
+    }
+
+    /**
+     * Remove highlight from a specific line
+     */
+    private async removeHighlightFromLine(codeBlock: HTMLElement, lineNumber: number) {
+        const nodeElement = codeBlock.closest('[data-node-id]') as HTMLElement;
+        if (!nodeElement) {
+            showMessage('Cannot find block ID', 3000, 'error');
+            return;
+        }
+
+        const blockId = nodeElement.getAttribute('data-node-id');
+        if (!blockId) {
+            showMessage('Cannot find block ID', 3000, 'error');
+            return;
+        }
+
+        // Get current highlights from attributes
+        const groups = await this.getHighlightGroupsFromAttributes(blockId);
+
+        // Remove line from all groups
+        let removed = false;
+        for (const group of groups) {
+            const index = group.lines.indexOf(lineNumber);
+            if (index !== -1) {
+                group.lines.splice(index, 1);
+                removed = true;
+            }
+        }
+
+        // Remove empty groups
+        const filteredGroups = groups.filter(g => g.lines.length > 0);
+
+        // Save to attributes
+        await this.saveHighlightGroupsToAttributes(blockId, filteredGroups);
+
+        // Re-process the code block (fire and forget)
+        this.processCodeBlock(codeBlock).catch(err => {
+            console.error('Error processing code block:', err);
+        });
+
+        if (removed) {
+            showMessage(`Highlight removed from line ${lineNumber}`, 2000, 'info');
+        }
+    }
+
+    /**
+     * Toggle highlight for a range of lines with a color
+     */
+    private async toggleHighlightRange(codeBlock: HTMLElement, startLine: number, endLine: number, color: 'yellow' | 'red' | 'green' | 'blue') {
+        const nodeElement = codeBlock.closest('[data-node-id]') as HTMLElement;
+        if (!nodeElement) {
+            showMessage('Cannot find block ID', 3000, 'error');
+            return;
+        }
+
+        const blockId = nodeElement.getAttribute('data-node-id');
+        if (!blockId) {
+            showMessage('Cannot find block ID', 3000, 'error');
+            return;
+        }
+
+        // Get current highlights from attributes
+        const groups = await this.getHighlightGroupsFromAttributes(blockId);
+
+        // Find the group for this color
+        let group = groups.find(g => g.color === color);
+        if (!group) {
+            group = { lines: [], color };
+            groups.push(group);
+        }
+
+        // Add all lines in the range if not already present
+        for (let line = startLine; line <= endLine; line++) {
+            if (!group.lines.includes(line)) {
+                group.lines.push(line);
+            }
+        }
+        group.lines.sort((a, b) => a - b);
+
+        // Save to attributes
+        await this.saveHighlightGroupsToAttributes(blockId, groups);
+
+        // Re-process the code block to apply changes (fire and forget)
+        this.processCodeBlock(codeBlock).catch(err => {
+            console.error('Error processing code block:', err);
+        });
+
+        const lineLabel = startLine === endLine ? `Line ${startLine}` : `Lines ${startLine}-${endLine}`;
+        showMessage(`${lineLabel} highlighted in ${color}`, 2000, 'info');
+    }
+
+    /**
+     * Remove highlight from a range of lines
+     */
+    private async removeHighlightFromLineRange(codeBlock: HTMLElement, startLine: number, endLine: number) {
+        const nodeElement = codeBlock.closest('[data-node-id]') as HTMLElement;
+        if (!nodeElement) {
+            showMessage('Cannot find block ID', 3000, 'error');
+            return;
+        }
+
+        const blockId = nodeElement.getAttribute('data-node-id');
+        if (!blockId) {
+            showMessage('Cannot find block ID', 3000, 'error');
+            return;
+        }
+
+        // Get current highlights from attributes
+        const groups = await this.getHighlightGroupsFromAttributes(blockId);
+
+        // Remove lines from all groups
+        let removed = false;
+        for (let line = startLine; line <= endLine; line++) {
+            for (const group of groups) {
+                const index = group.lines.indexOf(line);
+                if (index !== -1) {
+                    group.lines.splice(index, 1);
+                    removed = true;
+                }
+            }
+        }
+
+        // Remove empty groups
+        const filteredGroups = groups.filter(g => g.lines.length > 0);
+
+        // Save to attributes
+        await this.saveHighlightGroupsToAttributes(blockId, filteredGroups);
+
+        // Re-process the code block (fire and forget)
+        this.processCodeBlock(codeBlock).catch(err => {
+            console.error('Error processing code block:', err);
+        });
+
+        if (removed) {
+            const lineLabel = startLine === endLine ? `line ${startLine}` : `lines ${startLine}-${endLine}`;
+            showMessage(`Highlight removed from ${lineLabel}`, 2000, 'info');
+        }
+    }
+
+    /**
+     * Get highlight groups from block attributes
+     */
+    private async getHighlightGroupsFromAttributes(blockId: string): Promise<HighlightGroup[]> {
+        try {
+            const response = await fetchSyncPost('/api/attr/getBlockAttrs', { id: blockId });
+            if (response.code !== 0) {
+                console.warn('Failed to get block attributes:', response);
+                return [];
+            }
+
+            const attrs = response.data || {};
+            const groups: HighlightGroup[] = [];
+
+            // Invert colorToAttr mapping for reading
+            const attrToColor = Object.fromEntries(
+                Object.entries(this.colorToAttr).map(([color, attr]) => [attr, color as 'yellow' | 'red' | 'green' | 'blue'])
+            );
+
+            for (const [attrName, color] of Object.entries(attrToColor)) {
+                const value = attrs[attrName];
+                if (value) {
+                    const lines = this.parseLineSpec(value);
+                    if (lines.length > 0) {
+                        groups.push({ lines, color });
+                    }
+                }
+            }
+
+            return groups;
+        } catch (error) {
+            console.error('Error getting block attributes:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Save highlight groups to block attributes
+     */
+    private async saveHighlightGroupsToAttributes(blockId: string, groups: HighlightGroup[]): Promise<void> {
+        try {
+            const attrs: Record<string, string> = {};
+
+            for (const group of groups) {
+                const attrName = this.colorToAttr[group.color];
+                if (attrName && group.lines.length > 0) {
+                    attrs[attrName] = this.formatLineSpec(group.lines);
+                }
+            }
+
+            // Also set empty strings for colors that are not used (to clear them)
+            for (const color of Object.keys(this.colorToAttr)) {
+                const attrName = this.colorToAttr[color];
+                if (!(attrName in attrs)) {
+                    attrs[attrName] = '';
+                }
+            }
+
+            const response = await fetchSyncPost('/api/attr/setBlockAttrs', {
+                id: blockId,
+                attrs
+            });
+
+            if (response.code !== 0) {
+                console.error('Failed to set block attributes:', response);
+                showMessage('Failed to save highlights', 3000, 'error');
+            }
+        } catch (error) {
+            console.error('Error setting block attributes:', error);
+            showMessage('Failed to save highlights', 3000, 'error');
+        }
+    }
+
+    /**
+     * Format line numbers into a spec string like "1,3,5-7"
+     */
+    private formatLineSpec(lines: number[]): string {
+        if (lines.length === 0) {
+            return '';
+        }
+
+        const sorted = [...lines].sort((a, b) => a - b);
+        const ranges: string[] = [];
+        let rangeStart = sorted[0];
+        let rangeEnd = sorted[0];
+
+        for (let i = 1; i <= sorted.length; i++) {
+            if (i < sorted.length && sorted[i] === rangeEnd + 1) {
+                rangeEnd = sorted[i];
+            } else {
+                if (rangeStart === rangeEnd) {
+                    ranges.push(`${rangeStart}`);
+                } else if (rangeEnd === rangeStart + 1) {
+                    ranges.push(`${rangeStart},${rangeEnd}`);
+                } else {
+                    ranges.push(`${rangeStart}-${rangeEnd}`);
+                }
+
+                if (i < sorted.length) {
+                    rangeStart = sorted[i];
+                    rangeEnd = sorted[i];
+                }
+            }
+        }
+
+        return ranges.join(',');
     }
 
     /**
@@ -170,7 +934,10 @@ export default class LineHighlightPlugin extends Plugin {
      */
     private processAllCodeBlocks() {
         document.querySelectorAll('.code-block').forEach((block) => {
-            this.processCodeBlock(block as HTMLElement);
+            // Fire and forget - no need to await
+            this.processCodeBlock(block as HTMLElement).catch(err => {
+                console.error('Error processing code block:', err);
+            });
         });
     }
 
@@ -186,7 +953,10 @@ export default class LineHighlightPlugin extends Plugin {
 
         // Schedule new processing
         const timeout = window.setTimeout(() => {
-            this.processCodeBlock(codeBlock);
+            // Fire and forget - no need to await
+            this.processCodeBlock(codeBlock).catch(err => {
+                console.error('Error processing code block:', err);
+            });
             this.processingTimeouts.delete(codeBlock);
 
             // Also observe for resizes
@@ -304,7 +1074,9 @@ export default class LineHighlightPlugin extends Plugin {
                 // console.log('⌨️ Input detected in highlighted code block, re-processing...');
                 // Force re-processing after a short delay to let SiYuan finish its updates
                 setTimeout(() => {
-                    this.processCodeBlock(codeBlock);
+                    this.processCodeBlock(codeBlock).catch(err => {
+                        console.error('Error processing code block:', err);
+                    });
                 }, 300);
             }
         };
@@ -325,28 +1097,52 @@ export default class LineHighlightPlugin extends Plugin {
 
     /**
      * Process a code block to check for highlight markers
+     * Now reads from block attributes first, falls back to comment parsing
      */
-    private processCodeBlock(codeBlock: HTMLElement) {
+    private async processCodeBlock(codeBlock: HTMLElement) {
         const hljsElement = codeBlock.querySelector('.hljs');
         if (!hljsElement) {
             return;
         }
 
-        const text = hljsElement.textContent || '';
-        const lines = text.split('\n');
-        const firstLine = lines[0] || '';
+        // Get block ID
+        const nodeElement = codeBlock.closest('[data-node-id]') as HTMLElement;
+        const blockId = nodeElement?.getAttribute('data-node-id');
 
-        const marker = this.parseHighlightMarker(firstLine);
+        let groups: HighlightGroup[] = [];
+        let spec = '';
+
+        // First, try to read from block attributes
+        if (blockId) {
+            groups = await this.getHighlightGroupsFromAttributes(blockId);
+            if (groups.length > 0) {
+                // Generate spec string for tracking changes
+                spec = groups.map(g => `${g.color}:${this.formatLineSpec(g.lines)}`).join(';');
+            }
+        }
+
+        // Fall back to comment parsing if no attributes found (backward compatibility)
+        if (groups.length === 0) {
+            const text = hljsElement.textContent || '';
+            const lines = text.split('\n');
+            const firstLine = lines[0] || '';
+            const marker = this.parseHighlightMarker(firstLine);
+
+            if (marker) {
+                groups = marker.groups;
+                spec = marker.rawSpec;
+            }
+        }
 
         // Check existing overlays (stored as data attribute to avoid DOM pollution)
         const currentSpec = codeBlock.getAttribute('data-hl-active');
 
-        if (marker) {
+        if (groups.length > 0) {
             // Check if overlays still exist
             const existingWrapper = codeBlock.querySelector('.protyle-linenumber__rows .code-line-highlighter-overlay-wrapper');
 
             // Update if: spec changed OR no highlights exist (they were removed by SiYuan)
-            if (!currentSpec || currentSpec !== marker.rawSpec || !existingWrapper) {
+            if (!currentSpec || currentSpec !== spec || !existingWrapper) {
                 // Remove old highlights FIRST
                 this.removeHighlights(codeBlock);
 
@@ -355,12 +1151,12 @@ export default class LineHighlightPlugin extends Plugin {
 
                 // Wait a bit for line numbers to render, then apply
                 setTimeout(() => {
-                    this.applyHighlight(codeBlock, marker.groups, marker.rawSpec);
+                    this.applyHighlight(codeBlock, groups, spec);
                 }, 100);
             }
             // else: highlights are already correct and still exist, don't touch them!
         } else if (currentSpec) {
-            // No marker found but highlights exist - remove them
+            // No highlights found but highlights exist - remove them
             this.removeHighlights(codeBlock);
         }
     }
