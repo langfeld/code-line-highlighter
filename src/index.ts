@@ -48,9 +48,6 @@ export default class LineHighlightPlugin extends Plugin {
         // Load custom colors from storage
         await this.loadCustomColors();
 
-        // Setup settings panel
-        this.setupSettings();
-
         // CRITICAL: Monitor for overlays being added to code blocks and remove them!
         this.startCleanupObserver();
 
@@ -76,6 +73,14 @@ export default class LineHighlightPlugin extends Plugin {
 
         // Add context menu listener for right-click on code blocks
         this.eventBus.on("open-menu-content", this.handleContextMenu.bind(this));
+    }
+
+    /**
+     * Called after layout is ready - setup settings panel here
+     */
+    onLayoutReady() {
+        // Setup settings panel (must be done after layout is ready)
+        this.setupSettings();
     }
 
     /**
