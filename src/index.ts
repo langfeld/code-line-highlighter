@@ -1,5 +1,7 @@
 import {
-    Plugin
+    Plugin,
+    fetchSyncPost,
+    showMessage
 } from "siyuan";
 import "./index.css";
 
@@ -54,6 +56,337 @@ export default class LineHighlightPlugin extends Plugin {
         setTimeout(() => {
             this.observeCodeBlocks();
         }, 600);
+
+        // Add context menu listener for right-click on code blocks
+        this.eventBus.on("open-menu-content", this.handleContextMenu.bind(this));
+    }
+
+    /**
+     * Handle context menu for code blocks
+     */
+    private handleContextMenu(event: CustomEvent<any>) {
+        const detail = event.detail;
+        const { menu, protyle, element, range } = detail;
+
+        // Check if the selection is inside a code block
+        const codeBlock = element?.closest('.code-block') as HTMLElement;
+        if (!codeBlock) {
+            return;
+        }
+
+        // Calculate which line was clicked
+        const lineNumber = this.getLineNumberFromRange(codeBlock, range);
+        if (lineNumber === null) {
+            return;
+        }
+
+        // Add separator
+        menu.addSeparator();
+
+        // Add highlight submenu
+        const highlightMenu = {
+            label: `Highlight line ${lineNumber}`,
+            iconHTML: '🎨',
+            submenu: [
+                {
+                    label: 'Yellow',
+                    iconHTML: '<span style="color: #ffc107;">●</span>',
+                    click: () => this.toggleHighlight(codeBlock, lineNumber, 'yellow')
+                },
+                {
+                    label: 'Red',
+                    iconHTML: '<span style="color: #f44336;">●</span>',
+                    click: () => this.toggleHighlight(codeBlock, lineNumber, 'red')
+                },
+                {
+                    label: 'Green',
+                    iconHTML: '<span style="color: #4caf50;">●</span>',
+                    click: () => this.toggleHighlight(codeBlock, lineNumber, 'green')
+                },
+                {
+                    label: 'Blue',
+                    iconHTML: '<span style="color: #2196f3;">●</span>',
+                    click: () => this.toggleHighlight(codeBlock, lineNumber, 'blue')
+                }
+            ]
+        };
+
+        menu.addItem(highlightMenu);
+
+        // Add remove highlight option
+        menu.addItem({
+            label: `Remove highlight from line ${lineNumber}`,
+            iconHTML: '🚫',
+            click: () => this.removeHighlightFromLine(codeBlock, lineNumber)
+        });
+    }
+
+    /**
+     * Get line number from cursor/selection position
+     */
+    private getLineNumberFromRange(codeBlock: HTMLElement, range: Range): number | null {
+        if (!range) {
+            return null;
+        }
+
+        const hljsElement = codeBlock.querySelector('.hljs');
+        if (!hljsElement) {
+            return null;
+        }
+
+        const codeContentDiv = hljsElement.querySelector('div[contenteditable="true"]') as HTMLElement;
+        if (!codeContentDiv) {
+            return null;
+        }
+
+        // Get the text content and calculate line number from cursor position
+        const textContent = codeContentDiv.textContent || '';
+        const lines = textContent.split('\n');
+
+        // Find the line containing the range start
+        let startNode = range.startContainer;
+        
+        // If startNode is not a text node, try to get a text node
+        if (startNode.nodeType !== Node.TEXT_NODE) {
+            const walker = document.createTreeWalker(
+                startNode,
+                NodeFilter.SHOW_TEXT,
+                null
+            );
+            startNode = walker.nextNode() || startNode;
+        }
+
+        // Calculate offset from the start of contenteditable
+        let offset = range.startOffset;
+        let currentNode: Node | null = startNode;
+
+        // Walk backwards to calculate total offset
+        while (currentNode && currentNode !== codeContentDiv) {
+            const prevSibling: Node | null = currentNode.previousSibling;
+            if (prevSibling) {
+                offset += prevSibling.textContent?.length || 0;
+                currentNode = prevSibling;
+            } else {
+                currentNode = currentNode.parentNode;
+                if (currentNode === codeContentDiv) {
+                    break;
+                }
+            }
+        }
+
+        // Calculate line number from offset
+        let currentOffset = 0;
+        for (let i = 0; i < lines.length; i++) {
+            currentOffset += lines[i].length + 1; // +1 for newline
+            if (offset < currentOffset) {
+                return i + 1; // Line numbers are 1-based
+            }
+        }
+
+        return lines.length;
+    }
+
+    /**
+     * Toggle highlight for a specific line with a color
+     */
+    private async toggleHighlight(codeBlock: HTMLElement, lineNumber: number, color: 'yellow' | 'red' | 'green' | 'blue') {
+        const nodeElement = codeBlock.closest('[data-node-id]') as HTMLElement;
+        if (!nodeElement) {
+            showMessage('Cannot find block ID', 3000, 'error');
+            return;
+        }
+
+        const blockId = nodeElement.getAttribute('data-node-id');
+        if (!blockId) {
+            showMessage('Cannot find block ID', 3000, 'error');
+            return;
+        }
+
+        // Get current highlights from attributes
+        const groups = await this.getHighlightGroupsFromAttributes(blockId);
+
+        // Find the group for this color
+        let group = groups.find(g => g.color === color);
+        if (!group) {
+            group = { lines: [], color };
+            groups.push(group);
+        }
+
+        // Add line if not already present
+        if (!group.lines.includes(lineNumber)) {
+            group.lines.push(lineNumber);
+            group.lines.sort((a, b) => a - b);
+        }
+
+        // Save to attributes
+        await this.saveHighlightGroupsToAttributes(blockId, groups);
+
+        // Re-process the code block to apply changes
+        this.processCodeBlock(codeBlock);
+
+        showMessage(`Line ${lineNumber} highlighted in ${color}`, 2000, 'info');
+    }
+
+    /**
+     * Remove highlight from a specific line
+     */
+    private async removeHighlightFromLine(codeBlock: HTMLElement, lineNumber: number) {
+        const nodeElement = codeBlock.closest('[data-node-id]') as HTMLElement;
+        if (!nodeElement) {
+            showMessage('Cannot find block ID', 3000, 'error');
+            return;
+        }
+
+        const blockId = nodeElement.getAttribute('data-node-id');
+        if (!blockId) {
+            showMessage('Cannot find block ID', 3000, 'error');
+            return;
+        }
+
+        // Get current highlights from attributes
+        const groups = await this.getHighlightGroupsFromAttributes(blockId);
+
+        // Remove line from all groups
+        let removed = false;
+        for (const group of groups) {
+            const index = group.lines.indexOf(lineNumber);
+            if (index !== -1) {
+                group.lines.splice(index, 1);
+                removed = true;
+            }
+        }
+
+        // Remove empty groups
+        const filteredGroups = groups.filter(g => g.lines.length > 0);
+
+        // Save to attributes
+        await this.saveHighlightGroupsToAttributes(blockId, filteredGroups);
+
+        // Re-process the code block
+        this.processCodeBlock(codeBlock);
+
+        if (removed) {
+            showMessage(`Highlight removed from line ${lineNumber}`, 2000, 'info');
+        }
+    }
+
+    /**
+     * Get highlight groups from block attributes
+     */
+    private async getHighlightGroupsFromAttributes(blockId: string): Promise<HighlightGroup[]> {
+        try {
+            const response = await fetchSyncPost('/api/attr/getBlockAttrs', { id: blockId });
+            if (response.code !== 0) {
+                console.warn('Failed to get block attributes:', response);
+                return [];
+            }
+
+            const attrs = response.data || {};
+            const groups: HighlightGroup[] = [];
+
+            // Map attribute names to colors
+            const attrMap: Record<string, 'yellow' | 'red' | 'green' | 'blue'> = {
+                'custom-hl': 'yellow',
+                'custom-hlr': 'red',
+                'custom-hlg': 'green',
+                'custom-hlb': 'blue'
+            };
+
+            for (const [attrName, color] of Object.entries(attrMap)) {
+                const value = attrs[attrName];
+                if (value) {
+                    const lines = this.parseLineSpec(value);
+                    if (lines.length > 0) {
+                        groups.push({ lines, color });
+                    }
+                }
+            }
+
+            return groups;
+        } catch (error) {
+            console.error('Error getting block attributes:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Save highlight groups to block attributes
+     */
+    private async saveHighlightGroupsToAttributes(blockId: string, groups: HighlightGroup[]): Promise<void> {
+        try {
+            // Map colors to attribute names
+            const colorToAttr: Record<string, string> = {
+                'yellow': 'custom-hl',
+                'red': 'custom-hlr',
+                'green': 'custom-hlg',
+                'blue': 'custom-hlb'
+            };
+
+            const attrs: Record<string, string> = {};
+
+            for (const group of groups) {
+                const attrName = colorToAttr[group.color];
+                if (attrName && group.lines.length > 0) {
+                    attrs[attrName] = this.formatLineSpec(group.lines);
+                }
+            }
+
+            // Also set empty strings for colors that are not used (to clear them)
+            for (const color of ['yellow', 'red', 'green', 'blue']) {
+                const attrName = colorToAttr[color];
+                if (!(attrName in attrs)) {
+                    attrs[attrName] = '';
+                }
+            }
+
+            const response = await fetchSyncPost('/api/attr/setBlockAttrs', {
+                id: blockId,
+                attrs
+            });
+
+            if (response.code !== 0) {
+                console.error('Failed to set block attributes:', response);
+                showMessage('Failed to save highlights', 3000, 'error');
+            }
+        } catch (error) {
+            console.error('Error setting block attributes:', error);
+            showMessage('Failed to save highlights', 3000, 'error');
+        }
+    }
+
+    /**
+     * Format line numbers into a spec string like "1,3,5-7"
+     */
+    private formatLineSpec(lines: number[]): string {
+        if (lines.length === 0) {
+            return '';
+        }
+
+        const sorted = [...lines].sort((a, b) => a - b);
+        const ranges: string[] = [];
+        let rangeStart = sorted[0];
+        let rangeEnd = sorted[0];
+
+        for (let i = 1; i <= sorted.length; i++) {
+            if (i < sorted.length && sorted[i] === rangeEnd + 1) {
+                rangeEnd = sorted[i];
+            } else {
+                if (rangeStart === rangeEnd) {
+                    ranges.push(`${rangeStart}`);
+                } else if (rangeEnd === rangeStart + 1) {
+                    ranges.push(`${rangeStart},${rangeEnd}`);
+                } else {
+                    ranges.push(`${rangeStart}-${rangeEnd}`);
+                }
+
+                if (i < sorted.length) {
+                    rangeStart = sorted[i];
+                    rangeEnd = sorted[i];
+                }
+            }
+        }
+
+        return ranges.join(',');
     }
 
     /**
@@ -325,28 +658,52 @@ export default class LineHighlightPlugin extends Plugin {
 
     /**
      * Process a code block to check for highlight markers
+     * Now reads from block attributes first, falls back to comment parsing
      */
-    private processCodeBlock(codeBlock: HTMLElement) {
+    private async processCodeBlock(codeBlock: HTMLElement) {
         const hljsElement = codeBlock.querySelector('.hljs');
         if (!hljsElement) {
             return;
         }
 
-        const text = hljsElement.textContent || '';
-        const lines = text.split('\n');
-        const firstLine = lines[0] || '';
+        // Get block ID
+        const nodeElement = codeBlock.closest('[data-node-id]') as HTMLElement;
+        const blockId = nodeElement?.getAttribute('data-node-id');
 
-        const marker = this.parseHighlightMarker(firstLine);
+        let groups: HighlightGroup[] = [];
+        let spec = '';
+
+        // First, try to read from block attributes
+        if (blockId) {
+            groups = await this.getHighlightGroupsFromAttributes(blockId);
+            if (groups.length > 0) {
+                // Generate spec string for tracking changes
+                spec = groups.map(g => `${g.color}:${this.formatLineSpec(g.lines)}`).join(';');
+            }
+        }
+
+        // Fall back to comment parsing if no attributes found (backward compatibility)
+        if (groups.length === 0) {
+            const text = hljsElement.textContent || '';
+            const lines = text.split('\n');
+            const firstLine = lines[0] || '';
+            const marker = this.parseHighlightMarker(firstLine);
+
+            if (marker) {
+                groups = marker.groups;
+                spec = marker.rawSpec;
+            }
+        }
 
         // Check existing overlays (stored as data attribute to avoid DOM pollution)
         const currentSpec = codeBlock.getAttribute('data-hl-active');
 
-        if (marker) {
+        if (groups.length > 0) {
             // Check if overlays still exist
             const existingWrapper = codeBlock.querySelector('.protyle-linenumber__rows .code-line-highlighter-overlay-wrapper');
 
             // Update if: spec changed OR no highlights exist (they were removed by SiYuan)
-            if (!currentSpec || currentSpec !== marker.rawSpec || !existingWrapper) {
+            if (!currentSpec || currentSpec !== spec || !existingWrapper) {
                 // Remove old highlights FIRST
                 this.removeHighlights(codeBlock);
 
@@ -355,12 +712,12 @@ export default class LineHighlightPlugin extends Plugin {
 
                 // Wait a bit for line numbers to render, then apply
                 setTimeout(() => {
-                    this.applyHighlight(codeBlock, marker.groups, marker.rawSpec);
+                    this.applyHighlight(codeBlock, groups, spec);
                 }, 100);
             }
             // else: highlights are already correct and still exist, don't touch them!
         } else if (currentSpec) {
-            // No marker found but highlights exist - remove them
+            // No highlights found but highlights exist - remove them
             this.removeHighlights(codeBlock);
         }
     }
