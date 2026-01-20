@@ -1,8 +1,21 @@
 # SiYuan Code Line Highlighter Plugin
 
-Highlight specific code lines in SiYuan code blocks using compact comment syntax with multi-color support.
+Highlight specific code lines in SiYuan code blocks using an intuitive context menu or comment syntax with multi-color support.
 
 ## Usage
+
+### Method 1: Context Menu (New in v3.0.0) 🎨
+
+Simply **right-click** on any line in a code block to:
+- Highlight the line with your choice of color (yellow, red, green, blue)
+- Remove existing highlights
+
+This is the **recommended method** as it:
+- Stores highlights in block attributes (doesn't modify your code)
+- Works with any programming language
+- Provides a visual, user-friendly interface
+
+### Method 2: Comment Syntax (Legacy, still supported)
 
 Add a comment in the **first line** of your code block:
 
@@ -15,7 +28,7 @@ const qux = "line 4 - highlighted yellow";
 const test = "line 5 - highlighted yellow";
 ```
 
-### Multi-Color Syntax
+#### Multi-Color Syntax
 
 - `hl:` (default) — yellow
 - `hlr:` — red
@@ -35,7 +48,7 @@ const note2 = "line 6 - blue";
 const note3 = "line 7 - blue";
 ```
 
-### Supported Comment Syntaxes
+#### Supported Comment Syntaxes
 
 - `// ...` (JavaScript, TypeScript, C++, Java, etc.)
 - `# ...` (Python, Ruby, Bash, etc.)
@@ -44,10 +57,13 @@ const note3 = "line 7 - blue";
 
 ## Features
 
+- ✅ **Context menu integration** - Right-click to highlight/unhighlight lines
+- ✅ **Attribute-based storage** - Highlights stored in block attributes, not in code
 - ✅ Non-invasive overlays (not saved into note content)
 - ✅ Multi-color support (yellow, red, green, blue)
 - ✅ Responsive to window resize and code editing
 - ✅ Works with SiYuan's native syntax highlighting
+- ✅ Backward compatible with comment syntax
 
 ## Installation
 
@@ -73,6 +89,7 @@ npm run build
 
 ## Changelog (recent)
 
+- v3.0.0 — **Major Update**: Context menu integration, attribute-based storage, backward compatible
 - v2.1.4 — Prevent duplicate overlays on note open
 - v2.1.3 — Better re-render detection when overlays missing
 - v2.1.2 — Input listeners for code editing detection
