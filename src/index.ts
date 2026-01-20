@@ -1,7 +1,8 @@
 import {
     Plugin,
     fetchSyncPost,
-    showMessage
+    showMessage,
+    Setting
 } from "siyuan";
 import "./index.css";
 
@@ -118,9 +119,16 @@ export default class LineHighlightPlugin extends Plugin {
      * Setup settings panel
      */
     private setupSettings() {
-        const setting = this.setting;
+        // Initialize the setting object if not already done
+        if (!this.setting) {
+            this.setting = new Setting({
+                confirmCallback: () => {
+                    // Settings are auto-saved when changed, no need for explicit confirm
+                }
+            });
+        }
 
-        setting.addItem({
+        this.setting.addItem({
             title: 'Highlight Colors',
             description: 'Customize the colors used for code line highlighting',
             direction: 'column',
