@@ -221,8 +221,10 @@ export default class LineHighlightPlugin extends Plugin {
         // Save to attributes
         await this.saveHighlightGroupsToAttributes(blockId, groups);
 
-        // Re-process the code block to apply changes
-        this.processCodeBlock(codeBlock);
+        // Re-process the code block to apply changes (fire and forget)
+        this.processCodeBlock(codeBlock).catch(err => {
+            console.error('Error processing code block:', err);
+        });
 
         showMessage(`Line ${lineNumber} highlighted in ${color}`, 2000, 'info');
     }
@@ -262,8 +264,10 @@ export default class LineHighlightPlugin extends Plugin {
         // Save to attributes
         await this.saveHighlightGroupsToAttributes(blockId, filteredGroups);
 
-        // Re-process the code block
-        this.processCodeBlock(codeBlock);
+        // Re-process the code block (fire and forget)
+        this.processCodeBlock(codeBlock).catch(err => {
+            console.error('Error processing code block:', err);
+        });
 
         if (removed) {
             showMessage(`Highlight removed from line ${lineNumber}`, 2000, 'info');
@@ -503,7 +507,10 @@ export default class LineHighlightPlugin extends Plugin {
      */
     private processAllCodeBlocks() {
         document.querySelectorAll('.code-block').forEach((block) => {
-            this.processCodeBlock(block as HTMLElement);
+            // Fire and forget - no need to await
+            this.processCodeBlock(block as HTMLElement).catch(err => {
+                console.error('Error processing code block:', err);
+            });
         });
     }
 
@@ -519,7 +526,10 @@ export default class LineHighlightPlugin extends Plugin {
 
         // Schedule new processing
         const timeout = window.setTimeout(() => {
-            this.processCodeBlock(codeBlock);
+            // Fire and forget - no need to await
+            this.processCodeBlock(codeBlock).catch(err => {
+                console.error('Error processing code block:', err);
+            });
             this.processingTimeouts.delete(codeBlock);
 
             // Also observe for resizes
@@ -637,7 +647,9 @@ export default class LineHighlightPlugin extends Plugin {
                 // console.log('⌨️ Input detected in highlighted code block, re-processing...');
                 // Force re-processing after a short delay to let SiYuan finish its updates
                 setTimeout(() => {
-                    this.processCodeBlock(codeBlock);
+                    this.processCodeBlock(codeBlock).catch(err => {
+                        console.error('Error processing code block:', err);
+                    });
                 }, 300);
             }
         };
