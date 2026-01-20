@@ -225,17 +225,17 @@ export default class LineHighlightPlugin extends Plugin {
 
                     row.append(
                         this.createElement('div', { display: 'flex', flexDirection: 'column', alignItems: 'center', marginRight: '8px' }, {}, [
-                            this.createElement('span', { fontSize: '9px', color: 'var(--b3-theme-on-surface)' }, {}, ['Def']),
+                            this.createElement('span', { fontSize: '9px', color: 'var(--b3-theme-on-surface)' }, {}, ['Default']),
                             defaultRadio
                         ]),
                          this.createElement('div', { display: 'flex', flexDirection: 'column', alignItems: 'center', marginRight: '8px' }, {}, [
-                            this.createElement('span', { fontSize: '9px', color: 'var(--b3-theme-on-surface)' }, {}, ['Vis']),
+                            this.createElement('span', { fontSize: '9px', color: 'var(--b3-theme-on-surface)' }, {}, ['Visible']),
                             visibleCheck
                         ]),
                         labelInput, // Replaces static text
-                        this.createElement('span', { fontSize: '11px', color: 'var(--b3-theme-on-surface)' }, {}, ['BG:']), bgInput,
-                        this.createElement('span', { fontSize: '11px', color: 'var(--b3-theme-on-surface)', marginLeft: '4px' }, {}, ['Op:']), opacityInput,
-                        this.createElement('span', { fontSize: '11px', color: 'var(--b3-theme-on-surface)', marginLeft: '4px' }, {}, ['Bd:']), borderInput,
+                        this.createElement('span', { fontSize: '11px', color: 'var(--b3-theme-on-surface)' }, {}, ['Background']), bgInput,
+                        this.createElement('span', { fontSize: '11px', color: 'var(--b3-theme-on-surface)', marginLeft: '4px' }, {}, ['Opacity']), opacityInput,
+                        this.createElement('span', { fontSize: '11px', color: 'var(--b3-theme-on-surface)', marginLeft: '4px' }, {}, ['Border']), borderInput,
                         resetBtn
                     );
                     container.appendChild(row);
@@ -293,7 +293,7 @@ export default class LineHighlightPlugin extends Plugin {
         // 1. Default Color Action (Quick Access)
         menu.addItem({
             label: `Highlight ${label} (${defaultColorName})`,
-            iconHTML: `<span style="color: ${this.colors[defaultColor].border};">● </span>`,
+            iconHTML: `<span style="color: ${this.colors[defaultColor].border};">●&nbsp;&nbsp;</span>`,
             click: () => this.modifyBlockHighlights(codeBlock, (groups) => {
                 let group = groups.find(g => g.color === defaultColor);
                 if (!group) { group = { lines: [], color: defaultColor as any }; groups.push(group); }
@@ -311,8 +311,8 @@ export default class LineHighlightPlugin extends Plugin {
 
             const displayName = this.colors[color].label || color.charAt(0).toUpperCase() + color.slice(1);
             submenu.push({
-                label: displayName,
-                iconHTML: `<span style="color: ${this.colors[color].border};">● </span>`,
+                label: '  ' + displayName,
+                iconHTML: `<span style="color: ${this.colors[color].border};">●&nbsp;&nbsp;</span>`,
                 click: () => this.modifyBlockHighlights(codeBlock, (groups) => {
                     let group = groups.find(g => g.color === color);
                     if (!group) { group = { lines: [], color }; groups.push(group); }
@@ -332,7 +332,7 @@ export default class LineHighlightPlugin extends Plugin {
 
         // 3. Remove Highlight Action
         menu.addItem({
-            label: `Remove highlight from ${label}`, iconHTML: '🚫 ',
+            label: `  Remove highlight from ${label}`, iconHTML: '🚫&nbsp;&nbsp;',
             click: () => this.modifyBlockHighlights(codeBlock, (groups) => {
                 let removed = false;
                 for (let l = startLine; l <= endLine; l++) {

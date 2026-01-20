@@ -122,6 +122,7 @@ npm run build
 
 ## Changelog (recent)
 
+- v3.1.2 — Minor visual adjustments
 - v3.1.1 — Z-Index Fix
 - v3.1.0 — Custom colors for highlights and more improvements
 - v3.0.0 — **Major Update**: Context menu integration, multi-line selection, color customization, attribute-based storage

@@ -122,6 +122,7 @@ npm run build
 
 ## Changelog (aktuell)
 
+- v3.1.2 — Kleinere optische Anpassungen
 - v3.1.1 — Z-Index Fix
 - v3.1.0 — Benutzerdefinierte Farben für Hervorhebungen und weitere Verbesserungen
 - v3.0.0 — Major Update: Kontextmenü, Mehrzeilenauswahl, Farbanpassung, Speicherung in Block-Attributen
