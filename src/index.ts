@@ -36,8 +36,11 @@ export default class LineHighlightPlugin extends Plugin {
     };
 
     private colors: Record<string, ColorTheme> = {};
+    private config: { autoEnableLineNumber: boolean } = { autoEnableLineNumber: true };
 
     async onload() {
+        console.log('LineHighlightPlugin: onload');
+        await this.loadConfig();
         await this.loadCustomColors();
         this.startCleanupObserver();
 
@@ -51,10 +54,27 @@ export default class LineHighlightPlugin extends Plugin {
     }
 
     onLayoutReady() {
+        console.log('LineHighlightPlugin: onLayoutReady');
         this.setupSettings();
     }
 
+    private async loadConfig() {
+        try {
+            const loaded = await this.loadData('config.json');
+            if (loaded) {
+                this.config = { ...this.config, ...loaded };
+            }
+        } catch (e) {
+            console.error('Error loading config:', e);
+        }
+    }
+
+    private async saveConfig() {
+        await this.saveData('config.json', this.config);
+    }
+
     private async loadCustomColors() {
+        console.log('LineHighlightPlugin: loadCustomColors');
         try {
             const custom = await this.loadData('colors.json');
             this.colors = { ...this.defaultColors, ...custom };
@@ -65,6 +85,7 @@ export default class LineHighlightPlugin extends Plugin {
     }
 
     private async saveCustomColors() {
+        console.log('LineHighlightPlugin: saveCustomColors');
         await this.saveData('colors.json', this.colors);
         this.processAllCodeBlocks();
     }
@@ -90,6 +111,21 @@ export default class LineHighlightPlugin extends Plugin {
 
     private setupSettings() {
         if (!this.setting) this.setting = new Setting({ confirmCallback: () => {} });
+
+        this.setting.addItem({
+            title: 'Auto Enable Line Numbers',
+            description: 'Automatically enable line numbers when adding highlights (Required for highlights to show properly)',
+            direction: 'row',
+            createActionElement: () => {
+                const switchEl = this.createElement('input', { cursor: 'pointer' }, { type: 'checkbox' });
+                if (this.config.autoEnableLineNumber) switchEl.checked = true;
+                switchEl.addEventListener('change', async () => {
+                    this.config.autoEnableLineNumber = switchEl.checked;
+                    await this.saveConfig();
+                });
+                return switchEl;
+            }
+        });
 
         this.setting.addItem({
             title: 'Highlight Colors',
@@ -179,6 +215,7 @@ export default class LineHighlightPlugin extends Plugin {
     }
 
     private handleContextMenu(event: CustomEvent<any>) {
+        console.log('LineHighlightPlugin: handleContextMenu');
         const { menu, element, range } = event.detail;
         const codeBlock = element?.closest('.code-block') as HTMLElement;
         if (!codeBlock) return;
@@ -268,6 +305,7 @@ export default class LineHighlightPlugin extends Plugin {
     }
 
     private async modifyBlockHighlights(codeBlock: HTMLElement, action: (groups: HighlightGroup[]) => HighlightGroup[], successMsg?: string) {
+        console.log('LineHighlightPlugin: modifyBlockHighlights');
         const nodeElement = codeBlock.closest('[data-node-id]') as HTMLElement;
         const blockId = nodeElement?.getAttribute('data-node-id');
         if (!blockId) { showMessage('Cannot find block ID', 3000, 'error'); return; }
@@ -284,6 +322,7 @@ export default class LineHighlightPlugin extends Plugin {
     }
 
     private async getHighlightGroupsFromAttributes(blockId: string): Promise<HighlightGroup[]> {
+        console.log('LineHighlightPlugin: getHighlightGroupsFromAttributes', blockId);
         const response = await fetchSyncPost('/api/attr/getBlockAttrs', { id: blockId });
         const attrs = response.data || {};
         const groups: HighlightGroup[] = [];
@@ -299,6 +338,7 @@ export default class LineHighlightPlugin extends Plugin {
     }
 
     private async saveHighlightGroupsToAttributes(blockId: string, groups: HighlightGroup[], codeBlock?: HTMLElement): Promise<void> {
+        console.log('LineHighlightPlugin: saveHighlightGroupsToAttributes', blockId, groups);
         const attrs: Record<string, string> = {};
         const hasHighlights = groups.length > 0;
 
@@ -312,14 +352,14 @@ export default class LineHighlightPlugin extends Plugin {
         });
 
         // CRITICAL FIX: Ensure linenumber is set if highlights exist
-        if (hasHighlights) {
+        if (hasHighlights && this.config.autoEnableLineNumber) {
             attrs['linenumber'] = 'true';
         }
 
         await fetchSyncPost('/api/attr/setBlockAttrs', { id: blockId, attrs });
 
         // CRITICAL FIX: Force UI update immediately if we enabled line numbers
-        if (hasHighlights && codeBlock) {
+        if (hasHighlights && codeBlock && this.config.autoEnableLineNumber) {
             const nodeElement = codeBlock.closest('[data-node-id]') as HTMLElement;
             if (nodeElement) {
                 // 1. Set DOM attribute immediately
@@ -402,10 +442,12 @@ export default class LineHighlightPlugin extends Plugin {
     }
 
     private processAllCodeBlocks() {
+        console.log('LineHighlightPlugin: processAllCodeBlocks');
         document.querySelectorAll('.code-block').forEach(b => this.processCodeBlock(b as HTMLElement));
     }
 
     private scheduleProcessing(block: HTMLElement, delay: number) {
+        // console.log('LineHighlightPlugin: scheduleProcessing', block); // Might be too noisy
         if (this.processingTimeouts.has(block)) clearTimeout(this.processingTimeouts.get(block));
         this.processingTimeouts.set(block, window.setTimeout(() => {
             this.processCodeBlock(block);
@@ -418,6 +460,7 @@ export default class LineHighlightPlugin extends Plugin {
     }
 
     private observeCodeBlocks() {
+        console.log('LineHighlightPlugin: observeCodeBlocks');
         this.observer = new MutationObserver((mutations) => {
             mutations.forEach((m) => {
                 if (m.type === 'attributes' && m.attributeName === 'data-render') {
@@ -447,6 +490,7 @@ export default class LineHighlightPlugin extends Plugin {
     }
 
     private attachInputListener(codeBlock: HTMLElement) {
+        // console.log('LineHighlightPlugin: attachInputListener', codeBlock); // Might be too noisy
         const content = codeBlock.querySelector('.hljs div[contenteditable="true"]') as HTMLElement;
         if (!content || this.inputListeners.has(content)) return;
         const fn = () => {
@@ -461,6 +505,7 @@ export default class LineHighlightPlugin extends Plugin {
     }
 
     private async processCodeBlock(codeBlock: HTMLElement) {
+        console.log('LineHighlightPlugin: processCodeBlock');
         const node = codeBlock.closest('[data-node-id]') as HTMLElement;
         const blockId = node?.getAttribute('data-node-id');
         let groups: HighlightGroup[] = [], spec = '';
@@ -491,6 +536,8 @@ export default class LineHighlightPlugin extends Plugin {
     }
 
     private enableLineNumbers(codeBlock: HTMLElement) {
+        if (!this.config.autoEnableLineNumber) return;
+        console.log('LineHighlightPlugin: enableLineNumbers');
         if (codeBlock.querySelector('.protyle-linenumber__rows')) return;
         const node = codeBlock.closest('[data-node-id]') as HTMLElement;
         if (node) {
@@ -500,6 +547,7 @@ export default class LineHighlightPlugin extends Plugin {
     }
 
     private removeHighlights(codeBlock: HTMLElement) {
+        console.log('LineHighlightPlugin: removeHighlights');
         codeBlock.querySelectorAll('.code-line-highlighter-overlay-wrapper, .code-line-highlighter-container').forEach(el => el.remove());
         const id = this.getCodeBlockId(codeBlock);
         codeBlock.closest('.protyle-wysiwyg')?.querySelectorAll(`.code-line-highlighter-overlay-wrapper[data-code-block-id="${id}"]`).forEach(el => el.remove());
@@ -511,6 +559,7 @@ export default class LineHighlightPlugin extends Plugin {
     }
 
     private applyHighlight(codeBlock: HTMLElement, groups: HighlightGroup[], spec: string) {
+        console.log('LineHighlightPlugin: applyHighlight');
         const rows = codeBlock.querySelector('.protyle-linenumber__rows') as HTMLElement;
         const content = codeBlock.querySelector('.hljs div[contenteditable="true"]') as HTMLElement;
         if (!rows || !content) return;
@@ -582,6 +631,7 @@ export default class LineHighlightPlugin extends Plugin {
     }
 
     onunload() {
+        console.log('LineHighlightPlugin: onunload');
         this.observer?.disconnect();
         this.cleanupObserver?.disconnect();
         this.resizeObserver?.disconnect();
